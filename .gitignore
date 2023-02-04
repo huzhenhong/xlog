@@ -2,7 +2,7 @@
 .vscode/settings.json
 .cache
 .DS_Store
-build*
+build
 debug
 install
 config/*Config.cmake

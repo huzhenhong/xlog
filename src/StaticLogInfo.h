@@ -4,8 +4,8 @@
  * Author       : huzhenhong
  * Date         : 2022-10-17 15:21:58
  * LastEditors  : huzhenhong
- * LastEditTime : 2022-10-18 16:47:48
- * FilePath     : \\FmtLog\\src\\StaticLogInfo.h
+ * LastEditTime : 2023-02-04 13:14:23
+ * FilePath     : \\xlog\\src\\StaticLogInfo.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
