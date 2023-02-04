@@ -1,0 +1,27 @@
+CompileFlags:                             
+    Add: 
+      [
+        -std=c++17,
+        -Wno-documentation,
+        -Wno-missing-prototypes,
+      ]
+Diagnostics:
+  ClangTidy:
+    Add: ["*"]
+    Remove:
+      [
+        abseil*,
+        altera*,
+        fuchsia*,
+        llvmlib*,
+        zircon*,
+        google-readability-todo,
+        readability-braces-around-statements,
+        hicpp-braces-around-statements,
+        modernize-use-trailing-return-type,
+        hicpp-special-member-functions,
+        cppcoreguidelines-special-member-functions,
+        misc-const-correctness
+      ]
+Index:
+  Background: Build
