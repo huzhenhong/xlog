@@ -44,10 +44,17 @@ template<typename Arg>
 static inline constexpr bool IsNamedArg()
 {
     /*
-    执行 fmt::remove_cvref_t<Arg> 之后命名参数类型为 named_arg<Char, T>
+    执行 fmt::remove_cvref_t<Arg> 之后
+
+    命名参数类型为 named_arg<Char, T>
     接下来会调用 is_named_arg 的特化版本
     template <typename T, typename Char>
     struct is_named_arg<named_arg<Char, T>> : std::true_type {};
+
+    非命名参数类型为 T
+    接下来会调用 is_named_arg 的特化版本
+    template <typename T>
+    struct is_named_arg : std::false_type {};
     */
     return fmt::detail::is_named_arg<fmt::remove_cvref_t<Arg>>::value;
 }
@@ -82,7 +89,8 @@ static inline constexpr bool IsCstring()
 template<typename Arg>
 static inline constexpr bool IsString()
 {
-    return fmt::detail::mapped_type_constant<Arg, fmt::format_context>::value == fmt::detail::type::string_type;
+    return fmt::detail::mapped_type_constant<Arg, fmt::format_context>::value ==
+           fmt::detail::type::string_type;
 }
 
 template<typename Arg>
@@ -111,21 +119,23 @@ static inline constexpr size_t GetArgSize(size_t* pCstringSize, const Arg& arg, 
 {
     if constexpr (IsNamedArg<Arg>())
     {
+        // 如果是命名参数就提取其value
         return GetArgSize<CstringIdx>(pCstringSize, arg.value, args...);
     }
     else if constexpr (IsCstring<Arg>())
     {
-        size_t len               = strlen(arg) + 1;
+        size_t len               = strlen(arg) + 1;  // +1 是因为后面有个 '/ 0'
         pCstringSize[CstringIdx] = len;
-        return len + GetArgSize<CstringIdx + 1>(pCstringSize, args...);
+        return len + GetArgSize<CstringIdx + 1>(pCstringSize, args...);  // CstringIdx + 1 指向数组下一个位置
     }
     else if constexpr (IsString<Arg>())
     {
-        size_t len = arg.size() + 1;
+        size_t len = arg.size() + 1;  // string 为何要 +1？
         return len + GetArgSize<CstringIdx>(pCstringSize, args...);
     }
     else
     {
+        // 内置数值变量
         return sizeof(Arg) + GetArgSize<CstringIdx>(pCstringSize, args...);
     }
 }
@@ -152,7 +162,7 @@ static inline constexpr char* EncodeArgs(size_t* pCstringSize, char* out, Arg&& 
     {
         size_t len = arg.size();
         memcpy(out, arg.data(), len);
-        out[len] = 0;
+        out[len] = 0;  // 末尾补 0 作何用？
         return EncodeArgs<CstringIdx>(pCstringSize, out + len + 1, std::forward<Args>(args)...);
     }
     else
@@ -196,13 +206,17 @@ static inline constexpr void StoreNamedArgs(fmt::detail::named_arg_info<char>* n
 }
 
 template<bool ValueOnly, size_t Idx, size_t DestructIdx>
-static inline const char* DecodeArgs(const char* in, fmt::basic_format_arg<fmt::format_context>* args, const char** destruct_args)
+static inline const char* DecodeArgs(const char*                                 in,
+                                     fmt::basic_format_arg<fmt::format_context>* args,
+                                     const char**                                destruct_args)
 {
     return in;
 }
 
 template<bool ValueOnly, size_t Idx, size_t DestructIdx, typename Arg, typename... Args>
-static inline const char* DecodeArgs(const char* in, fmt::basic_format_arg<fmt::format_context>* args, const char** destruct_args)
+static inline const char* DecodeArgs(const char*                                 in,
+                                     fmt::basic_format_arg<fmt::format_context>* args,
+                                     const char**                                destruct_args)
 {
     // using namespace fmtlogdetail;
     using ArgType = fmt::remove_cvref_t<Arg>;
@@ -293,75 +307,86 @@ static inline void DestructArgs(const char** destruct_args)
 template<bool Reorder, typename... Args>
 fmt::string_view UnNameFormat(fmt::string_view in, uint32_t* reorderIdx, const Args&... args)
 {
-    constexpr size_t num_named_args = fmt::detail::count<IsNamedArg<Args>()...>();
-    if constexpr (num_named_args == 0)
+    constexpr size_t namedArgCnt = fmt::detail::count<IsNamedArg<Args>()...>();
+    if constexpr (namedArgCnt == 0)
     {
         return in;
     }
 
-    const char*                       begin = in.data();
-    const char*                       p     = begin;
-    std::unique_ptr<char[]>           unnamed_str(new char[in.size() + 1 + num_named_args * 5]);
-    fmt::detail::named_arg_info<char> named_args[std::max(num_named_args, (size_t)1)];
+    // namedArgArr 保存的是 namedArgIdx -- {argName, argIdx}
+    fmt::detail::named_arg_info<char> namedArgArr[std::max(namedArgCnt, (size_t)1)];
+    StoreNamedArgs<0, 0>(namedArgArr, args...);
 
-    StoreNamedArgs<0, 0>(named_args, args...);
+    std::unique_ptr<char[]> unNamedStrUptr(new char[in.size() + 1 + namedArgCnt * 5]);  // 为什么 + 1 + namedArgCnt * 5？为什么是 unique_ptr
+    char*                   pOut        = (char*)unNamedStrUptr.get();
+    const char*             pBegin      = in.data();
+    const char*             pCur        = pBegin;
+    uint8_t                 namedArgIdx = 0;
 
-    char*   out     = (char*)unnamed_str.get();
-    uint8_t arg_idx = 0;
+    // {HMSf} {s:<16} {l}[{t:<6}] => {} {:<16} {}[{:<6}]
     while (true)
     {
-        auto c = *p++;
+        char c = *pCur++;
         if (!c)
         {
-            size_t copy_size = p - begin - 1;
-            memcpy(out, begin, copy_size);
-            out += copy_size;
+            //  处理完成
+            size_t copySize = pCur - pBegin - 1;
+            memcpy(pOut, pBegin, copySize);
+            pOut += copySize;
             break;
         }
-        if (c != '{')
-            continue;
-        size_t copy_size = p - begin;
-        memcpy(out, begin, copy_size);
-        out += copy_size;
-        begin = p;
-        c     = *p++;
-        if (!c)
-            fmt::detail::throw_format_error("invalid format string");
+
+        if (c != '{') continue;
+
+        size_t copySize = pCur - pBegin;  // 第一次到这里时为 1，拷贝 {
+        memcpy(pOut, pBegin, copySize);
+        pOut += copySize;
+        pBegin = pCur;
+        c      = *pCur++;
+
+        if (!c) fmt::detail::throw_format_error("invalid format string");
+
         if (fmt::detail::is_name_start(c))
         {
-            while ((fmt::detail::is_name_start(c = *p) || ('0' <= c && c <= '9')))
+            while ((fmt::detail::is_name_start(c = *pCur) || ('0' <= c && c <= '9')))
             {
-                ++p;
+                ++pCur;
             }
-            fmt::string_view name(begin, p - begin);
-            int              id = -1;
-            for (size_t i = 0; i < num_named_args; ++i)
+
+            fmt::string_view name(pBegin, pCur - pBegin);
+
+            int              id = -1;  // argIdx
+            for (size_t i = 0; i < namedArgCnt; ++i)
             {
-                if (named_args[i].name == name)
+                if (namedArgArr[i].name == name)
                 {
-                    id = named_args[i].id;
+                    id = namedArgArr[i].id;
                     break;
                 }
             }
-            if (id < 0)
-                fmt::detail::throw_format_error("invalid format string");
+
+            if (id < 0) fmt::detail::throw_format_error("invalid format string");
+
             if constexpr (Reorder)
             {
-                reorderIdx[id] = arg_idx++;
+                reorderIdx[id] = namedArgIdx++;  // 映射回去
             }
             else
             {
-                out = fmt::format_to(out, "{}", id);
+                pOut = fmt::format_to(pOut, "{}", id);
             }
         }
         else
         {
-            *out++ = c;
+            *pOut++ = c;
         }
-        begin = p;
+
+        pBegin = pCur;
     }
-    const char* ptr = unnamed_str.release();
-    return fmt::string_view(ptr, out - ptr);
+
+    const char* ptr = unNamedStrUptr.release();
+
+    return fmt::string_view(ptr, pOut - ptr);
 }
 
 template<typename... Args>
@@ -373,12 +398,13 @@ const char* FormatTo(fmt::string_view                                         fo
 {
     constexpr size_t num_args  = sizeof...(Args);
     constexpr size_t num_dtors = fmt::detail::count<IsNeedCallDestructor<Args>()...>();
-    const char*      dtor_args[std::max(num_dtors, (size_t)1)];
+    const char*      dtor_args[std::max(num_dtors, (size_t)1)];  // 需要手动销毁的参数索引
     const char*      ret;
     if (argIdx < 0)
     {
         argIdx = (int)args.size();
         args.resize(argIdx + num_args);
+        // template<bool ValueOnly, size_t Idx, size_t DestructIdx, typename Arg, typename... Args>
         ret = DecodeArgs<false, 0, 0, Args...>(data, args.data() + argIdx, dtor_args);
     }
     else

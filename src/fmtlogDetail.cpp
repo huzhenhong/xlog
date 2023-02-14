@@ -13,9 +13,9 @@ fmtlogDetail::fmtlogDetail()
 
     TimeStampCounterWarpper::impl.Reset();
 
-    resetDate();
+    ResetDate();
     // fmtlog::setLogFile(stdout);
-    setHeaderPattern("{HMSF} {s:<16} {l}[{t:<6}] ");
+    SetHeaderPattern("{HMSF} {s:<16} {l}[{t:<6}] ");
     // setHeaderPattern("{HMSf} {s:<16} {l}[{t:<6}] ");
     m_newLogInfo.reserve(32);
     m_allLogInfoVec.reserve(128);
@@ -42,11 +42,11 @@ void fmtlogDetail::RegisterLogInfo(uint32_t&        logId,
                                    LogLevel         level,
                                    fmt::string_view fmtString)
 {
-    std::lock_guard<std::mutex> lock(logInfoMutex);
+    std::lock_guard<std::mutex> lock(m_logInfoMutex);  // 注册时必须加锁
     if (logId)
-        return;
+        return;  // 其实根本不存在这种可能
 
-    // logInfos 都会移到 bgLogInfos 里面去，bgLogInfos 不会删除日志，所以logId 只增不减
+    // m_newLogInfo 在 poll 的时候都会移到 bgLogInfos m_allLogInfoVec 不会删除日志，所以logId 只增不减
     logId = m_newLogInfo.size() + m_allLogInfoVec.size();
 
     m_newLogInfo.emplace_back(fn, location, level, fmtString);
@@ -55,14 +55,14 @@ void fmtlogDetail::RegisterLogInfo(uint32_t&        logId,
 SpScVarQueue::MsgHeader* fmtlogDetail::AllocMsg(uint32_t size)
 {
     if (!m_pThreadBuffer)
-        preallocate();
+        PreAllocate();
 
     return m_pThreadBuffer->varq.AllocMsg(size);  // 当前线程新打印一条日志
 }
 
-void fmtlogDetail::setHeaderPattern(const char* pattern)
+void fmtlogDetail::SetHeaderPattern(const char* pattern)
 {
-    if (shouldDeallocateHeader)
+    if (m_shouldDeallocateHeader)
         delete[] m_headerPattern.data();
 
     // 每个参数参数对应的位置，先全部初始化为最后YmdHMSF
@@ -88,6 +88,12 @@ void fmtlogDetail::setHeaderPattern(const char* pattern)
     得到 named_arg 对象
     */
 
+    // 下面列出了所有支持的模式
+    // 如果有命名参数, 会对"pattern"进行修改, 需要对其进行释放
+    // pattern：{HMSf} {s:<16} {l}[{t:<6}]
+    // headerPattern：{} {:<16} {}[{:<6}]
+    // reorderIdx：{24, 24, 24, 24, 24, 24, 3, 24, 24, ...}
+    // 目的就是找到每个参数对应的索引，后面再根据这个索引来设置参数的值
     using namespace fmt::literals;
     m_headerPattern = UnNameFormat<true>(pattern,
                                          m_reorderIdx,
@@ -117,14 +123,8 @@ void fmtlogDetail::setHeaderPattern(const char* pattern)
                                          "YmdHMSe"_a = "",
                                          "YmdHMSf"_a = "",
                                          "YmdHMSF"_a = "");
-    // 上面列出了所有支持的模式
 
-    // 如果有命名参数, 会对"pattern"进行修改, 需要对其进行释放
-    // pattern：{HMSf} {s:<16} {l}[{t:<6}]
-    // headerPattern：{} {:<16} {}[{:<6}]
-    // reorderIdx：{24, 24, 24, 24, 24, 24, 3, 24, 24, ...}
-    // 目的就是找到每个参数对应的索引，后面再根据这个索引来设置参数的值
-    shouldDeallocateHeader = m_headerPattern.data() != pattern;
+    m_shouldDeallocateHeader = m_headerPattern.data() != pattern;
 
     // 确定参数类型，占个坑，因为后面的setArgVal只是设置值，没有改变参数类型和占用内存大小
     // 没有的话会导致后面vformat_to时崩溃，特别是后面也没有setArgVal再手动设置时间戳
@@ -158,7 +158,7 @@ void fmtlogDetail::setHeaderPattern(const char* pattern)
 }
 
 
-void fmtlogDetail::resetDate()
+void fmtlogDetail::ResetDate()
 {
     time_t     rawtime  = TimeStampCounterWarpper::impl.Rdns() / 1000'000'000;  // s
     struct tm* timeinfo = localtime(&rawtime);
@@ -167,15 +167,15 @@ void fmtlogDetail::resetDate()
     year.fromi(1900 + timeinfo->tm_year);
     month.fromi(1 + timeinfo->tm_mon);
     day.fromi(timeinfo->tm_mday);
-    const char* weekdays[7]    = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-    weekdayName                = weekdays[timeinfo->tm_wday];
-    const char* monthNames[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-    monthName                  = monthNames[timeinfo->tm_mon];
+    static const char* weekdays[7]    = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    weekdayName                       = weekdays[timeinfo->tm_wday];
+    static const char* monthNames[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    monthName                         = monthNames[timeinfo->tm_mon];
 }
 
-void fmtlogDetail::preallocate()
+void fmtlogDetail::PreAllocate()
 {
-    if (m_pThreadBuffer)
+    if (m_pThreadBuffer)  // 这里其实不用再判断了
         return;
 
     // 多线程环境创建各自的缓冲区
@@ -197,8 +197,8 @@ void fmtlogDetail::preallocate()
     // 这里的用途就是为了在线程退出时会根据
     // fmtlog::threadBuffer->shouldDeallocate = true;
     // 释放 HeapNode 里的 ThreadBuffer，也就是 fmtlog::m_pThreadBuffer
-    thread_local ThreadBufferDestroyer sbc;  // 定义为局部变量自带static属性
-    sbc.threadBufferCreated();               // 延迟初始化 threadlocal
+    thread_local ThreadBufferDestroyer sbc;  // 定义为局部变量自带 static 属性
+    sbc.threadBufferCreated();               // 延迟初始化 threadlocal，static 变量只有在第一次使用时才会初始化
 
     std::unique_lock<std::mutex> guard(m_threadBufMtx);
     m_newThreadBufVec.push_back(m_pThreadBuffer);
@@ -251,7 +251,7 @@ void fmtlogDetail::handleLog(fmt::string_view               threadName,
     int64_t     tsc       = *(int64_t*)pData;
     int64_t     curTimeNs = TimeStampCounterWarpper::impl.Tsc2ns(tsc);
     // the date could go back when polling different threads
-    uint64_t    tmp       = (curTimeNs > midnightNs) ? (curTimeNs - midnightNs) : 0;
+    uint64_t    tmp       = (curTimeNs > midnightNs) ? (curTimeNs - midnightNs) : 0;  // 貌似有问题，跳变了就直接记录为 00:00:00？
     nanosecond.fromi(tmp % 1000'000'000);
     tmp /= 1000'000'000;  // s
     second.fromi(tmp % 60);
@@ -262,25 +262,25 @@ void fmtlogDetail::handleLog(fmt::string_view               threadName,
     if (h > 23)        // 24:00:00，两条日志间隔超过有可能很大
     {
         h %= 24;
-        resetDate();  // 重置年月日
+        ResetDate();  // 重置年月日
     }
     hour.fromi(h);
 
-    pData += 8;  // 跳过 tsc
-    StaticLogInfo& info = m_allLogInfoVec[pHeader->logId];
+    pData += 8;                                             // 跳过 tsc
+    StaticLogInfo& info = m_allLogInfoVec[pHeader->logId];  // m_allLogInfoVec 都是按顺序 push 的
     if (!info.formatToFn)
     {
         // log once
-        info.location = *(const char**)pData;
+        info.m_pLocation = *(const char**)pData;
         pData += 8;  // 跳过 location
-        info.processLocation();
+        info.ProcessLocation();
     }
 
-    setArgVal<14>(info.getBase());      // 函数名
-    setArgVal<15>(info.getLocation());  // 调用代码位置
+    setArgVal<14>(info.GetBase());      // 函数名
+    setArgVal<15>(info.GetLocation());  // 调用代码位置
 
     // 日志级别
-    m_logLevel = (const char*)"DBG INF WRN ERR OFF" + (info.logLevel << 2);
+    m_logLevel = (const char*)"DBG INF WRN ERR OFF" + (info.m_logLevel << 2);
 
     size_t headerPos = m_membuf.size();
 
@@ -288,10 +288,11 @@ void fmtlogDetail::handleLog(fmt::string_view               threadName,
     vformat_to(m_membuf, m_headerPattern, fmt::basic_format_args(m_patternArgVec.data(), parttenArgSize));
     size_t bodyPos = m_membuf.size();
 
+    // boby process
     if (info.formatToFn)
     {
         // decode args
-        info.formatToFn(info.formatString, pData, m_membuf, info.argIdx, m_patternArgVec);
+        info.formatToFn(info.formatString, pData, m_membuf, info.m_argIdx, m_patternArgVec);
     }
     else
     {
@@ -300,12 +301,12 @@ void fmtlogDetail::handleLog(fmt::string_view               threadName,
     }
 
     // 可以将单条日志推送上去
-    if (logCB && info.logLevel >= m_minCBLogLevel)
+    if (logCB && info.m_logLevel >= m_minCBLogLevel)
     {
         logCB(curTimeNs,
-              info.logLevel,
-              info.getLocation(),
-              info.basePos,
+              info.m_logLevel,
+              info.GetLocation(),
+              info.m_basePosOffset,
               threadName,
               fmt::string_view(m_membuf.data() + headerPos, m_membuf.size() - headerPos),
               bodyPos - headerPos /* ,
@@ -315,7 +316,7 @@ void fmtlogDetail::handleLog(fmt::string_view               threadName,
 }
 
 // 堆化
-void fmtlogDetail::adjustHeap(size_t i)
+void fmtlogDetail::AdjustHeap(size_t i)
 {
     while (true)
     {
@@ -363,16 +364,16 @@ void fmtlogDetail::poll(bool forceFlush)
     // 将新添加的日志移到日志容器
     if (m_newLogInfo.size() > 0)
     {
-        std::unique_lock<std::mutex> lock(logInfoMutex);  // registerLogInfo 的时候也会用到 m_newLogInfo
+        std::unique_lock<std::mutex> lock(m_logInfoMutex);  // registerLogInfo 的时候也会用到 m_newLogInfo
         for (auto& info : m_newLogInfo)
         {
-            info.processLocation();
+            info.ProcessLocation();
         }
         m_allLogInfoVec.insert(m_allLogInfoVec.end(), m_newLogInfo.begin(), m_newLogInfo.end());
         m_newLogInfo.clear();
     }
 
-    // 将新创建的线程buf移到buf容器里去
+    // 将新创建的线程 buf 移到 buf 容器里去
     if (m_newThreadBufVec.size() > 0)
     {
         std::unique_lock<std::mutex> lock(m_threadBufMtx);
@@ -384,7 +385,7 @@ void fmtlogDetail::poll(bool forceFlush)
     }
 
     // 删除退出线程
-    for (size_t i = 0; i < m_allThreadBufVec.size(); i++)
+    for (size_t i = 0; i < m_allThreadBufVec.size(); ++i)
     {
         auto& node = m_allThreadBufVec[i];
         if (node.pHeader) continue;  // 不可能出现吧
@@ -398,7 +399,7 @@ void fmtlogDetail::poll(bool forceFlush)
             delete node.thBuf;
             node = m_allThreadBufVec.back();  // 将最后面的buf指针放到当前位置
             m_allThreadBufVec.pop_back();     // 删除最后面的
-            i--;
+            --i;
         }
     }
 
@@ -407,9 +408,9 @@ void fmtlogDetail::poll(bool forceFlush)
     // build heap，小顶堆
     // 最后一个非叶子节点（size / 2 - 1）
     // for (int i = m_allThreadBufVec.size() / 2; i >= 0; i--)
-    for (int i = m_allThreadBufVec.size() / 2 - 1; i >= 0; i--)
+    for (int i = m_allThreadBufVec.size() / 2 - 1; i >= 0; --i)
     {
-        adjustHeap(i);
+        AdjustHeap(i);
     }
     // 现在 m_allThreadBufVec[0].pHeader 是最小的
 
@@ -426,14 +427,14 @@ void fmtlogDetail::poll(bool forceFlush)
         if (!h || h->logId >= m_allLogInfoVec.size() || *(int64_t*)(h + 1) >= tsc)  // header 之后保存着时戳，检测时钟跳变
             break;
 
-        // 处理当前线程buf
+        // 处理当前线程 buf
         auto tb = m_allThreadBufVec[0].thBuf;
         handleLog(fmt::string_view(tb->name, tb->nameSize), h);
         tb->varq.Pop();                                   // 擦除标记，不是释放
         m_allThreadBufVec[0].pHeader = tb->varq.Front();  // 指向下一条日志
 
         // 堆从小到大排序，确保 m_allThreadBufVec[0].pHeader 为时戳最早的那个线程
-        adjustHeap(0);  // 下沉，再次拿到最小的放在开始位置
+        AdjustHeap(0);  // 下沉，再次拿到最小的放在开始位置
     }
 }
 

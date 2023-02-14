@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2022-10-17 15:21:58
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-04 13:14:23
+ * LastEditTime : 2023-02-13 15:28:38
  * FilePath     : \\xlog\\src\\StaticLogInfo.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -22,54 +22,57 @@ struct StaticLogInfo
                             fmt::string_view fmtString)
         : formatToFn(fn)
         , formatString(fmtString)
-        , location(loc)
-        , logLevel(level)
-        , argIdx(-1)
-        , basePos(0)
-        , endPos(0)
+        , m_pLocation(loc)
+        , m_logLevel(level)
+        , m_argIdx(-1)
+        , m_basePosOffset(0)
+        , m_locationLength(0)
     {
     }
 
-    void processLocation()
+    void ProcessLocation()
     {
         // 对长路径进行截断
-        size_t      size = strlen(location);
-        const char* p    = location + size;
+        size_t      size = strlen(m_pLocation);
+        const char* pEnd = m_pLocation + size;  // 指向末尾
         if (size > 255)
         {
-            location = p - 255;
+            m_pLocation = pEnd - 255;
         }
-        endPos           = p - location;
-        const char* base = location;
-        while (p > location)
+        m_locationLength = pEnd - m_pLocation;
+
+        // 分割文件名
+        const char* pBase = m_pLocation;
+        while (pEnd > m_pLocation)
         {
-            char c = *--p;
+            char c = *--pEnd;
             if (c == '/' || c == '\\')
             {
-                base = p + 1;
+                pBase = pEnd + 1;
                 break;
             }
         }
-        basePos = base - location;
+        m_basePosOffset = pBase - m_pLocation;
     }
 
     // 获取文件名
-    inline fmt::string_view getBase()
+    inline fmt::string_view GetBase()
     {
-        return fmt::string_view(location + basePos, endPos - basePos);
+        return fmt::string_view(m_pLocation + m_basePosOffset,
+                                m_locationLength - m_basePosOffset);
     }
 
     // 获取路径
-    inline fmt::string_view getLocation()
+    inline fmt::string_view GetLocation()
     {
-        return fmt::string_view(location, endPos);
+        return fmt::string_view(m_pLocation, m_locationLength);
     }
 
     FormatToFn       formatToFn;
     fmt::string_view formatString;
-    const char*      location;
-    LogLevel         logLevel;
-    int              argIdx;
-    uint8_t          basePos;
-    uint8_t          endPos;
+    const char*      m_pLocation;
+    LogLevel         m_logLevel;
+    int              m_argIdx;
+    uint8_t          m_basePosOffset;
+    uint8_t          m_locationLength;
 };

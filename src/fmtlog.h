@@ -150,7 +150,7 @@ class fmtlog
                     int64_t                                          tsc,
                     const char*                                      location,
                     LogLevel                                         level,
-                    fmt::format_string<fmt::remove_cvref_t<Args>...> format,
+                    fmt::format_string<fmt::remove_cvref_t<Args>...> format,  // fmt::remove_cvref_t<Args>... 为去除const 以及引用
                     Args&&... args) noexcept
     {
         // #ifdef FMTLOG_NO_CHECK_LEVEL
@@ -162,32 +162,35 @@ class fmtlog
         //         }
         // #endif
 
-        if (!logId)
+        if (!logId)  // logId 是局部静态变量的引用，任何一条日志首次运行到这里时 logId 均为 0，也就是一定会执行下面的注册流程
         {
+            // 去除命名参数
             auto unnamed_format = UnNameFormat<false>(fmt::string_view(format), nullptr, args...);
 
-            // FormatTo<Args...> 是实例化一个函数，里面做DecodeArgs
+            // FormatTo<Args...> 是利用 Args... 作为模版参数先实例化一个函数，函数里面做 DecodeArgs 的时候会用到 Args...
             registerLogInfo(logId, FormatTo<Args...>, location, level, unnamed_format);
         }
 
-        // cstring需要手动释放内存
-        constexpr size_t num_cstring = fmt::detail::count<IsCstring<Args>()...>();
-        size_t           cstringSizes[std::max(num_cstring, (size_t)1)];
-        uint32_t         alloc_size = 8 + (uint32_t)GetArgSize<0>(cstringSizes, args...);  // 这里的 8 是用来放时间戳的
+        // cstring 需要手动释放内存，因为归根结底就是个指针
+        constexpr size_t num_cstring = fmt::detail::count<IsCstring<Args>()...>();  // 计算有多少个 cstring 类型的参数
+        size_t           cstringSizes[std::max(num_cstring, (size_t)1)];            // 需要保证 cstringSizes 不为空，这块代码逻辑应该还有优化空间
+
+        // 从第一个参数开始判断，cstringSizes 记录所有 cstring 类型参数的长度
+        uint32_t         alloc_size = 8 + (uint32_t)GetArgSize<0>(cstringSizes, args...);  // 这里的 8 是用来放时间戳的，GetArgSize 计算所有参数需要的内存
         do
         {
             // 应该直接把 logId 也传进去，header在内部就完成初始化
-            if (auto header = AllocMsg(alloc_size))  // 申请内存起始为msg数据头，指明logId和msg大小
+            if (auto header = AllocMsg(alloc_size))  // 申请内存起始为 msg 数据头，指明 logId 和 msg 大小
             {
                 header->logId   = logId;
-                char* pOut      = (char*)(header + 1);
+                char* pOut      = (char*)(header + 1);  // 第一个 blank 记录着 logId 和 msg 大小
                 *(int64_t*)pOut = tsc;
                 pOut += 8;
                 EncodeArgs<0>(cstringSizes, pOut, std::forward<Args>(args)...);
                 header->push(alloc_size);  // 可以直接在 AllocMsg 里面去初始化size
                 break;
             }
-        } while (FMTLOG_BLOCK);
+        } while (FMTLOG_BLOCK);  // 是否阻塞当前线程直到 push 成功
     }
 
 

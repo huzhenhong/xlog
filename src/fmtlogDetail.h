@@ -75,13 +75,13 @@ class fmtlogDetail
                                              fmt::string_view fmtString);
 
     SpScVarQueue::MsgHeader* AllocMsg(uint32_t size);
-    void                     setHeaderPattern(const char* pattern);
-    void                     resetDate();
-    void                     preallocate();
+    void                     SetHeaderPattern(const char* pattern);
+    void                     ResetDate();
+    void                     PreAllocate();
     void                     startPollingThread(int64_t pollInterval);
     void                     stopPollingThread();
     void                     handleLog(fmt::string_view threadName, const SpScVarQueue::MsgHeader* header);
-    void                     adjustHeap(size_t i);
+    void                     AdjustHeap(size_t i);
     void                     poll(bool forceFlush);
     void                     setLogFile(const char* filename, bool truncate = false);
 
@@ -102,11 +102,11 @@ class fmtlogDetail
   public:
     int64_t                                                 midnightNs;
     fmt::string_view                                        m_headerPattern;
-    bool                                                    shouldDeallocateHeader = false;
+    bool                                                    m_shouldDeallocateHeader = false;
     std::mutex                                              m_threadBufMtx;
     std::vector<ThreadBuffer*>                              m_newThreadBufVec;
     std::vector<HeapNode>                                   m_allThreadBufVec;
-    std::mutex                                              logInfoMutex;
+    std::mutex                                              m_logInfoMutex;
     std::vector<StaticLogInfo>                              m_newLogInfo;
     std::vector<StaticLogInfo>                              m_allLogInfoVec;
     LogCBFn                                                 logCB = nullptr;

@@ -4,8 +4,8 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:46
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-01-09 16:29:01
- * FilePath     : \\FmtLog\\src\\logger.h
+ * LastEditTime : 2023-02-07 16:13:23
+ * FilePath     : \\xlog\\src\\logger.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
@@ -13,7 +13,7 @@
 // #include "TSCNS.h"
 
 // class fmtlogWrapper;
-// class TimeStampCounterWarpper;
+// class TimeStampCounterWarpper; 前置声明只是有助于使用该类型来做声明，并不能直接使用
 
 #define __FMTLOG_S1(x) #x
 #define __FMTLOG_S2(x) __FMTLOG_S1(x)
@@ -21,6 +21,7 @@
 
 
 // 注意这里logId是局部静态变量，所以同一条日志只会初始化一次
+// 先判断日志级别应该是防止log和Rdtsc调用的开销
 #define FMTLOG(level, format, ...)                                     \
     do                                                                 \
     {                                                                  \

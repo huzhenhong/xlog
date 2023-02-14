@@ -61,7 +61,7 @@ SpScVarQueue::MsgHeader* fmtlog::AllocMsg(uint32_t size) noexcept
 
 void fmtlog::preallocate() noexcept
 {
-    fmtlogDetailWrapper::impl.preallocate();
+    fmtlogDetailWrapper::impl.PreAllocate();
 }
 
 void fmtlog::setLogLevel(LogLevel logLevel) noexcept
@@ -185,7 +185,7 @@ void fmtlog::setLogCB(LogCBFn cb, LogLevel minCBLogLevel_) noexcept
 
 void fmtlog::setHeaderPattern(const char* pattern)
 {
-    fmtlogDetailWrapper::impl.setHeaderPattern(pattern);
+    fmtlogDetailWrapper::impl.SetHeaderPattern(pattern);
 }
 
 
