@@ -4,8 +4,8 @@
  * Author       : huzhenhong
  * Date         : 2022-10-18 16:44:49
  * LastEditors  : huzhenhong
- * LastEditTime : 2022-10-19 14:12:33
- * FilePath     : \\FmtLog\\src\\common.h
+ * LastEditTime : 2023-02-14 18:08:55
+ * FilePath     : \\xlog\\src\\Common.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
@@ -50,7 +50,7 @@ using FormatToFn = const char* (*)(fmt::string_view                             
 using LogCBFn = std::function<void(int64_t          ns,
                                    LogLevel         level,
                                    fmt::string_view location,
-                                   size_t           basePos,
+                                   fmt::string_view funcname,
                                    fmt::string_view threadName,
                                    fmt::string_view msg,
-                                   size_t           bodyPos)>;
+                                   size_t           bodyOffSet)>;

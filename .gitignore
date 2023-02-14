@@ -8,3 +8,4 @@ install
 config/*Config.cmake
 config/*ConfigVersion.cmake
 ext
+*.txt

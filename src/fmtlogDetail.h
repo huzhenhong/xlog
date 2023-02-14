@@ -4,8 +4,8 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:46
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-01-06 19:53:11
- * FilePath     : \\FmtLog\\src\\fmtlogDetail.h
+ * LastEditTime : 2023-02-14 18:09:21
+ * FilePath     : \\xlog\\src\\fmtlogDetail.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
@@ -17,6 +17,7 @@
 #include "SPSCVarQueueOPT.h"
 #include <iostream>
 #include "FileSink.h"
+#include "PatternFormatter.h"
 
 
 #ifdef _WIN32
@@ -71,12 +72,11 @@ class fmtlogDetail
     void                     RegisterLogInfo(uint32_t&        logId,
                                              FormatToFn       fn,
                                              const char*      location,
+                                             const char*      funcName,
                                              LogLevel         level,
                                              fmt::string_view fmtString);
 
     SpScVarQueue::MsgHeader* AllocMsg(uint32_t size);
-    void                     SetHeaderPattern(const char* pattern);
-    void                     ResetDate();
     void                     PreAllocate();
     void                     startPollingThread(int64_t pollInterval);
     void                     stopPollingThread();
@@ -85,61 +85,23 @@ class fmtlogDetail
     void                     poll(bool forceFlush);
     void                     setLogFile(const char* filename, bool truncate = false);
 
-    template<size_t I, typename T>
-    inline void setArg(const T& arg)
-    {
-        m_patternArgVec[m_reorderIdx[I]] = fmt::detail::make_arg<fmt::format_context>(arg);
-    }
-
-    template<size_t I, typename T>
-    inline void setArgVal(const T& arg)
-    {
-        fmt::detail::value<fmt::format_context>& value_ = *(fmt::detail::value<fmt::format_context>*)&m_patternArgVec[m_reorderIdx[I]];
-        value_                                          = fmt::detail::arg_mapper<fmt::format_context>().map(arg);
-        int i                                           = 0;
-    }
 
   public:
-    int64_t                                                 midnightNs;
-    fmt::string_view                                        m_headerPattern;
-    bool                                                    m_shouldDeallocateHeader = false;
-    std::mutex                                              m_threadBufMtx;
-    std::vector<ThreadBuffer*>                              m_newThreadBufVec;
-    std::vector<HeapNode>                                   m_allThreadBufVec;
-    std::mutex                                              m_logInfoMutex;
-    std::vector<StaticLogInfo>                              m_newLogInfo;
-    std::vector<StaticLogInfo>                              m_allLogInfoVec;
-    LogCBFn                                                 logCB = nullptr;
-    LogLevel                                                m_minCBLogLevel;
-    fmt::basic_memory_buffer<char, 10000>                   m_membuf;  // 日志写入的地方
-    const static int                                        parttenArgSize = 25;
-    uint32_t                                                m_reorderIdx[parttenArgSize];
+    std::mutex                             m_threadBufMtx;
+    std::vector<ThreadBuffer*>             m_newThreadBufVec;
+    std::vector<HeapNode>                  m_allThreadBufVec;
+    std::mutex                             m_logInfoMutex;
+    std::vector<StaticLogInfo>             m_newLogInfo;
+    std::vector<StaticLogInfo>             m_allLogInfoVec;
+    LogCBFn                                logCB = nullptr;
+    LogLevel                               m_minCBLogLevel;
+    fmt::basic_memory_buffer<char, 10000>  m_membuf;  // 日志写入的地方
+    volatile bool                          m_isThreadRunning = false;
+    std::thread                            m_thr;
+    static FAST_THREAD_LOCAL ThreadBuffer* m_pThreadBuffer;  // __thread 时只能修饰static成员变量
+    std::shared_ptr<ISink>                 m_fileSinkSptr = nullptr;
 
-    Str<3>                                                  weekdayName;
-    Str<3>                                                  monthName;
-    Str<3>                                                  m_logLevel;
-
-    // 这块必须是连续的，根据偏移量来format
-    Str<4>                                                  year;
-    char                                                    dash1 = '-';
-    Str<2>                                                  month;
-    char                                                    dash2 = '-';
-    Str<2>                                                  day;
-    char                                                    space = ' ';
-    Str<2>                                                  hour;
-    char                                                    colon1 = ':';
-    Str<2>                                                  minute;
-    char                                                    colon2 = ':';
-    Str<2>                                                  second;
-    char                                                    dot1 = '.';
-    Str<9>                                                  nanosecond;
-
-
-    std::vector<fmt::basic_format_arg<fmt::format_context>> m_patternArgVec;  // 参数索引-参数类型&值
-    volatile bool                                           m_isThreadRunning = false;
-    std::thread                                             m_thr;
-    static FAST_THREAD_LOCAL ThreadBuffer*                  m_pThreadBuffer;  // __thread 时只能修饰static成员变量
-    std::shared_ptr<ISink>                                  m_fileSinkSptr = nullptr;
+    PatternFormatterSptr                   m_patternFormaterSptr;
 };
 
 

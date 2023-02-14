@@ -4,13 +4,14 @@
  * Author       : huzhenhong
  * Date         : 2022-10-19 11:00:55
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-01-09 15:22:17
- * FilePath     : \\FmtLog\\src\\FileSink.h
+ * LastEditTime : 2023-02-14 15:20:31
+ * FilePath     : \\xlog\\src\\FileSink.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
 #include "ISink.h"
 #include "TSCNS.h"
+#include <cstddef>
 
 
 class FileSink : public ISink
@@ -47,6 +48,11 @@ class FileSink : public ISink
                 }
             }
         }
+    }
+
+    size_t GetFilePos() noexcept
+    {
+        return m_fpos;
     }
 
     void SetFlushDelay(int64_t ns) noexcept

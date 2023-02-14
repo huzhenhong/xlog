@@ -93,17 +93,6 @@ class fmtlog
     // Set a callback function for all log msgs with a mininum log level
     static void                     setLogCB(LogCBFn cb, LogLevel minCBLogLevel) noexcept;
 
-    // static void                     LogCB(int64_t          ns,
-    //                                       LogLevel         level,
-    //                                       fmt::string_view location,
-    //                                       size_t           basePos,
-    //                                       fmt::string_view threadName,
-    //                                       fmt::string_view msg,
-    //                                       size_t           bodyPos /* ,
-    //                                        size_t           logFilePos */
-    //                                       ) noexcept;
-
-
     // Close the log file and subsequent msgs will not be written into the file,
     // but callback function can still be used
     static void                     closeLogFile() noexcept;
@@ -140,6 +129,7 @@ class fmtlog
     static void                     registerLogInfo(uint32_t&        logId,
                                                     FormatToFn       fn,
                                                     const char*      location,
+                                                    const char*      funcName,
                                                     LogLevel         level,
                                                     fmt::string_view fmtString) noexcept;
 
@@ -149,6 +139,7 @@ class fmtlog
     inline void log(uint32_t&                                        logId,
                     int64_t                                          tsc,
                     const char*                                      location,
+                    const char*                                      funcName,
                     LogLevel                                         level,
                     fmt::format_string<fmt::remove_cvref_t<Args>...> format,  // fmt::remove_cvref_t<Args>... 为去除const 以及引用
                     Args&&... args) noexcept
@@ -168,7 +159,7 @@ class fmtlog
             auto unnamed_format = UnNameFormat<false>(fmt::string_view(format), nullptr, args...);
 
             // FormatTo<Args...> 是利用 Args... 作为模版参数先实例化一个函数，函数里面做 DecodeArgs 的时候会用到 Args...
-            registerLogInfo(logId, FormatTo<Args...>, location, level, unnamed_format);
+            registerLogInfo(logId, FormatTo<Args...>, location, funcName, level, unnamed_format);
         }
 
         // cstring 需要手动释放内存，因为归根结底就是个指针

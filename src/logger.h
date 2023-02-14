@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:46
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-07 16:13:23
+ * LastEditTime : 2023-02-14 14:31:53
  * FilePath     : \\xlog\\src\\logger.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -33,6 +33,7 @@
         fmtlogWrapper::impl.log(logId,                                 \
                                 TimeStampCounterWarpper::impl.Rdtsc(), \
                                 __FMTLOG_LOCATION,                     \
+                                __FUNCTION__,                          \
                                 level,                                 \
                                 format,                                \
                                 ##__VA_ARGS__);                        \

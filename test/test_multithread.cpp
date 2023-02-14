@@ -4,8 +4,8 @@
  * Author       : huzhenhong
  * Date         : 2023-01-06 20:04:05
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-01-06 20:18:44
- * FilePath     : \\FmtLog\\test\\test_multithread.cpp
+ * LastEditTime : 2023-02-14 15:34:44
+ * FilePath     : \\xlog\\test\\test_multithread.cpp
  * Copyright (C) 2023 huzhenhong. All rights reserved.
  *************************************************************************************/
 #include <chrono>
@@ -24,13 +24,14 @@ size_t      msg_cnt = 0;
 size_t      cb_size = 0;
 
 void        logcb(int64_t          ns,
-                  //   fmtlog::LogLevel level,
                   LogLevel         level,
                   fmt::string_view location,
-                  size_t           basePos,
+                  fmt::string_view funcname,
+                  //    size_t           basePos,
                   fmt::string_view threadName,
                   fmt::string_view msg,
-                  size_t           bodyPos /* ,
+                  size_t           bodyOffSet
+                  /* size_t           bodyPos ,
                    size_t           logFilePos */
        )
 {

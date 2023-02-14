@@ -4,8 +4,8 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:54
  * LastEditors  : huzhenhong
- * LastEditTime : 2022-10-26 10:26:04
- * FilePath     : \\FmtLog\\test\\TestClass.cpp
+ * LastEditTime : 2023-02-14 17:57:58
+ * FilePath     : \\xlog\\test\\TestClass.cpp
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #include <iostream>
@@ -48,7 +48,10 @@ int main(int argc, char* argv[])
     // std::thread t1(func);
     // t1.join();
 
+    fmtlog::setLogFile("/dev/null", false);
+
     std::thread::id tid = std::this_thread::get_id();
+
     logi("1, {}", *(unsigned int*)&tid);
     logi("1, {}", 1);
     logi("2, {}", 2);

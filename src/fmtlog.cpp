@@ -10,31 +10,6 @@
 fmtlog::fmtlog()
 {
     std::cout << "fmtlog()\n";
-    // setLogFile(stdout);
-    // m_fileSinkSptr = std::make_shared<FileSink>("fmtlog.txt", true);
-
-    // // fmtlogDetailWrapper::impl.logCB = std::bind(&fmtlog::LogCB,
-    // //                                             this,
-    // //                                             std::placeholders::_1,
-    // //                                             std::placeholders::_2,
-    // //                                             std::placeholders::_3,
-    // //                                             std::placeholders::_4,
-    // //                                             std::placeholders::_5,
-    // //                                             std::placeholders::_6,
-    // //                                             std::placeholders::_7);
-
-    // fmtlogDetailWrapper::impl.logCB = [m_fileSinkSptr = m_fileSinkSptr](int64_t          ns,
-    //                                                                     LogLevel         level,
-    //                                                                     fmt::string_view location,
-    //                                                                     size_t           basePos,
-    //                                                                     fmt::string_view threadName,
-    //                                                                     fmt::string_view msg,
-    //                                                                     size_t           bodyPos /* ,
-    //                                                                      size_t           logFilePos */
-    //                                   )
-    // {
-    //     m_fileSinkSptr->Sink(level, msg);
-    // };
 }
 
 
@@ -48,10 +23,11 @@ fmtlog::~fmtlog()
 void fmtlog::registerLogInfo(uint32_t&        logId,
                              FormatToFn       fn,
                              const char*      location,
+                             const char*      funcName,
                              LogLevel         level,
                              fmt::string_view fmtString) noexcept
 {
-    fmtlogDetailWrapper::impl.RegisterLogInfo(logId, fn, location, level, fmtString);
+    fmtlogDetailWrapper::impl.RegisterLogInfo(logId, fn, location, funcName, level, fmtString);
 }
 
 SpScVarQueue::MsgHeader* fmtlog::AllocMsg(uint32_t size) noexcept
@@ -86,20 +62,6 @@ LogLevel fmtlog::getLogLevel() noexcept
 void fmtlog::setLogFile(const char* filename, bool truncate)
 {
     fmtlogDetailWrapper::impl.setLogFile(filename, truncate);
-    // m_fileSinkSptr
-    // auto& d     = fmtlogDetailWrapper::impl;
-    // FILE* newFp = fopen(filename, truncate ? "w" : "a");
-    // if (!newFp)
-    // {
-    //     std::string err = fmt::format("Unable to open file: {}: {}", filename, strerror(errno));
-    //     fmt::detail::throw_format_error(err.c_str());
-    // }
-    // setbuf(newFp, nullptr);
-    // d.m_fpos = ftell(newFp);
-
-    // closeLogFile();
-    // d.m_outputFp   = newFp;
-    // d.m_isManageFp = true;
 }
 
 
@@ -169,23 +131,10 @@ void fmtlog::setLogCB(LogCBFn cb, LogLevel minCBLogLevel_) noexcept
     d.m_minCBLogLevel = minCBLogLevel_;
 }
 
-// void fmtlog::LogCB(int64_t          ns,
-//                    LogLevel         level,
-//                    fmt::string_view location,
-//                    size_t           basePos,
-//                    fmt::string_view threadName,
-//                    fmt::string_view msg,
-//                    size_t           bodyPos /* ,
-//                     size_t           logFilePos */
-//                    ) noexcept
-// {
-//     // std::cout << msg.data() << std::endl;
-//     m_fileSinkSptr->Sink(LogLevel(), msg);
-// }
 
 void fmtlog::setHeaderPattern(const char* pattern)
 {
-    fmtlogDetailWrapper::impl.SetHeaderPattern(pattern);
+    // fmtlogDetailWrapper::impl.SetHeaderPattern(pattern);
 }
 
 
