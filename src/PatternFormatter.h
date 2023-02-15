@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2023-01-09 18:18:24
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-14 17:15:44
+ * LastEditTime : 2023-02-16 00:27:01
  * FilePath     : \\xlog\\src\\PatternFormatter.h
  * Copyright (C) 2023 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -60,11 +60,11 @@ class PatternFormatter
             YmdHMSe	Year-Month-Day Hour:Minute:Second.Millisecond	                2021-05-03 16:08:09.796
             YmdHMSf	Year-Month-Day Hour:Minute:Second.Microsecond	                2021-05-03 16:08:09.796341
             YmdHMSF	Year-Month-Day Hour:Minute:Second.Nanosecond	                2021-05-03 16:08:09.796341126
-
+            func    function name                                                   main
             Note that using concatenated named args is more efficient than seperated ones, e.g.
             {YmdHMS} is faster than {Y}-{m}-{d} {H}:{M}:{S}
         */
-        SetHeaderPattern("{YmdHMSF} {s:<16} {l} [{t:<6}] ");
+        SetHeaderPattern("{YmdHMSF} {s:<16} {func} {l} [{t:<6}] ");
         // memset(m_membuf.data(), 0, m_membuf.capacity());
     }
 
@@ -115,8 +115,9 @@ class PatternFormatter
             info.ProcessLocation();
         }
 
-        SetArgVal<14>(info.GetBase());      // 函数名
-        SetArgVal<15>(info.GetLocation());  // 调用代码位置
+        SetArgVal<14>(info.GetBase());      // 文件名+行号
+        SetArgVal<15>(info.GetLocation());  // 绝对路径名+行号
+        SetArgVal<25>(info.GetFuncName());  // 函数名
 
         // 日志级别
         m_logLevel = (const char*)"DBG INF WRN ERR OFF" + (info.m_logLevel << 2);
@@ -185,12 +186,18 @@ class PatternFormatter
         得到 named_arg 对象
         */
 
-        // 下面列出了所有支持的模式
-        // 如果有命名参数, 会对"pattern"进行修改, 需要对其进行释放
-        // pattern：{HMSf} {s:<16} {l}[{t:<6}]
+        // 目的就是找到每个罗列的命名参数对应在 pattern 中的位置索引，后面再根据这个索引来设置参数的值
+        // pattern：{YmdHMSF} {s:<16} {l}[{t:<6}]
         // headerPattern：{} {:<16} {}[{:<6}]
-        // reorderIdx：{24, 24, 24, 24, 24, 24, 3, 24, 24, ...}
-        // 目的就是找到每个参数对应的索引，后面再根据这个索引来设置参数的值
+        // 下面列出了所有支持的模式
+
+        // m_reorderIdx：当前罗列的这个参数，对应在 pattern 中的哪个位置
+        // 初始化后是 {24, 24, 24, 24, 24, 24, 24, 24, 24, ...}，一共 parttenArgSize 个，那这个地方就有问题了，意思就是 pattern 中最多只能有 parttenArgSize 个需要格式化输出的条目
+        // UnNameFormat 之后 {24, 24, 24, 24, 24, 24, 3, 24, 24, 24, 24, 24, 24, 2, 1, 24, 24, 24, 24, 24, 24, 24, 24, 24, 0}
+        // t 在罗列的参数里的索引是 6， 在pattern 中的位置是第 3
+        // l 在罗列的参数里的索引是 13， 在pattern 中的位置是第 2
+        // s 在罗列的参数里的索引是 14， 在pattern 中的位置是第 1
+        // YmdHMSF 在罗列的参数里的索引是 24， 在pattern 中的位置是第 0
         using namespace fmt::literals;
         m_headerPattern = UnNameFormat<true>(pattern,
                                              m_reorderIdx,
@@ -208,7 +215,6 @@ class PatternFormatter
                                              "M"_a       = "",
                                              "H"_a       = "",
                                              "l"_a       = "INF",
-                                             //  "l"_a       = LogLevel(),
                                              "s"_a       = "fmtlog.cpp:123",
                                              "g"_a       = "/home/raomeng/fmtlog/fmtlog.cpp:123",
                                              "Ymd"_a     = "",
@@ -219,39 +225,41 @@ class PatternFormatter
                                              "YmdHMS"_a  = "",
                                              "YmdHMSe"_a = "",
                                              "YmdHMSf"_a = "",
-                                             "YmdHMSF"_a = "");
+                                             "YmdHMSF"_a = "",
+                                             "func"_a    = "");
 
+        // 如果有命名参数, 会对"pattern"进行修改, 需要对其进行释放
         m_shouldDeallocateHeader = m_headerPattern.data() != pattern;
 
         // 确定参数类型，占个坑，因为后面的setArgVal只是设置值，没有改变参数类型和占用内存大小
         // 没有的话会导致后面vformat_to时崩溃，特别是后面也没有setArgVal再手动设置时间戳
         // 虽然可以选择
-        SetArg<0>(fmt::string_view(m_weekdayName.str, 3));
-        SetArg<1>(fmt::string_view(m_monthName.str, 3));
-        SetArg<2>(fmt::string_view(&m_year[2], 2));
-        SetArg<3>(fmt::string_view(m_year.str, 4));
-        SetArg<4>(fmt::string_view(m_month.str, 2));
-        SetArg<5>(fmt::string_view(m_day.str, 2));
-        SetArg<6>(fmt::string_view());  // 对应线程名，无法确定长度，需要每次手动设置
-        SetArg<7>(fmt::string_view(m_nanosecond.str, 9));
-        SetArg<8>(fmt::string_view(m_nanosecond.str, 6));
-        SetArg<9>(fmt::string_view(m_nanosecond.str, 3));
-        SetArg<10>(fmt::string_view(m_second.str, 2));
-        SetArg<11>(fmt::string_view(m_minute.str, 2));
-        SetArg<12>(fmt::string_view(m_hour.str, 2));
-        SetArg<13>(fmt::string_view(m_logLevel.str, 3));
-        SetArg<14>(fmt::string_view());                // 日志位置相对路径，无法确定长度，需要每次手动设置
-        SetArg<15>(fmt::string_view());                // 日志位置绝对路径，无法确定长度，需要每次手动设置
-        SetArg<16>(fmt::string_view(m_year.str, 10));  // Ymd
-        SetArg<17>(fmt::string_view(m_hour.str, 8));   // HMS
-        SetArg<18>(fmt::string_view(m_hour.str, 12));  // HMSe
-        SetArg<19>(fmt::string_view(m_hour.str, 15));  // HMSf
-        SetArg<20>(fmt::string_view(m_hour.str, 18));  // HMSF，精确到纳秒
-        // setArg<20>(fmt::string_view());              // HMSF，意思就是后面不手动设置的话就是不要
-        SetArg<21>(fmt::string_view(m_year.str, 19));  // YmdHMS
-        SetArg<22>(fmt::string_view(m_year.str, 23));  // YmdHMSe
-        SetArg<23>(fmt::string_view(m_year.str, 26));  // YmdHMSf
-        SetArg<24>(fmt::string_view(m_year.str, 29));  // YmdHMSF
+        SetArg<0>(fmt::string_view(m_weekdayName.str, 3));  // a	    Weekday	                                         Mon
+        SetArg<1>(fmt::string_view(m_monthName.str, 3));    // b	    Month name	                                     May
+        SetArg<2>(fmt::string_view(&m_year[2], 2));         // C	    Short year	                                     21
+        SetArg<3>(fmt::string_view(m_year.str, 4));         // Y	    Year	                                         2021
+        SetArg<4>(fmt::string_view(m_month.str, 2));        // m	    Month	                                         05
+        SetArg<5>(fmt::string_view(m_day.str, 2));          // d	    Day	                                             03
+        SetArg<6>(fmt::string_view());                      // t	    Thread id by default 	                         main thread
+        SetArg<7>(fmt::string_view(m_nanosecond.str, 9));   // F	    Nanosecond	                                     796341126
+        SetArg<8>(fmt::string_view(m_nanosecond.str, 6));   // f	    Microsecond	                                     796341
+        SetArg<9>(fmt::string_view(m_nanosecond.str, 3));   // e	    Millisecond	                                     796
+        SetArg<10>(fmt::string_view(m_second.str, 2));      // S	    Second	                                         09
+        SetArg<11>(fmt::string_view(m_minute.str, 2));      // M	    Minute	                                         08
+        SetArg<12>(fmt::string_view(m_hour.str, 2));        // H	    Hour	                                         16
+        SetArg<13>(fmt::string_view(m_logLevel.str, 3));    // l	    Log level	                                     INF
+        SetArg<14>(fmt::string_view());                     // s	    File base name and line num	                     log_test.cc:48
+        SetArg<15>(fmt::string_view());                     // g	    File path and line num	                         /home/raomeng/fmtlog/log_test.cc:48
+        SetArg<16>(fmt::string_view(m_year.str, 10));       // Ymd      Year-Month-Day	                                 2021-05-03
+        SetArg<17>(fmt::string_view(m_hour.str, 8));        // HMS      Hour:Minute:Second	                             16:08:09
+        SetArg<18>(fmt::string_view(m_hour.str, 12));       // HMSe	    Hour:Minute:Second.Millisecond	                 16:08:09.796
+        SetArg<19>(fmt::string_view(m_hour.str, 15));       // HMSf	    Hour:Minute:Second.Microsecond	                 16:08:09.796341
+        SetArg<20>(fmt::string_view(m_hour.str, 18));       // HMSF	    Hour:Minute:Second.Nanosecond	                 16:08:09.796341126
+        SetArg<21>(fmt::string_view(m_year.str, 19));       // YmdHMS	Year-Month-Day Hour:Minute:Second	             2021-05-03 16:08:09
+        SetArg<22>(fmt::string_view(m_year.str, 23));       // YmdHMSe	Year-Month-Day Hour:Minute:Second.Millisecond	 2021-05-03 16:08:09.796
+        SetArg<23>(fmt::string_view(m_year.str, 26));       // YmdHMSf	Year-Month-Day Hour:Minute:Second.Microsecond	 2021-05-03 16:08:09.796341
+        SetArg<24>(fmt::string_view(m_year.str, 29));       // YmdHMSF	Year-Month-Day Hour:Minute:Second.Nanosecond	 2021-05-03 16:08:09.796341126
+        SetArg<25>(fmt::string_view());                     // func	    funciton name                                    main
     }
 
     template<size_t I, typename T>
@@ -286,10 +294,9 @@ class PatternFormatter
   private:
     int64_t                                                 midnightNs;
     fmt::string_view                                        m_headerPattern;
-    std::vector<fmt::basic_format_arg<fmt::format_context>> m_patternArgVec;  // 参数索引-参数类型&值
+    std::vector<fmt::basic_format_arg<fmt::format_context>> m_patternArgVec;  // 命名参数索引 —— 参数类型&值
     bool                                                    m_shouldDeallocateHeader = false;
-    // fmt::basic_memory_buffer<char, 10000>                   m_membuf;  // 日志写入的地方
-    const static int                                        parttenArgSize           = 25;
+    const static int                                        parttenArgSize           = 25 + 1;
     uint32_t                                                m_reorderIdx[parttenArgSize];
 
     Str<3>                                                  m_weekdayName;
