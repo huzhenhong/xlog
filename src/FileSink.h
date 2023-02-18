@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2022-10-19 11:00:55
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-14 15:20:31
+ * LastEditTime : 2023-02-18 22:05:15
  * FilePath     : \\xlog\\src\\FileSink.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -22,7 +22,10 @@ class FileSink : public ISink
         Open(filename, truncate);
     }
 
-    ~FileSink() {}
+    ~FileSink()
+    {
+        Flush();  // 防止启动就退出日志不落盘
+    }
 
     void Sink(LogLevel level, fmt::string_view msg) override
     {
