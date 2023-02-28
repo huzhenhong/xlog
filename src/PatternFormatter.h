@@ -4,68 +4,68 @@
  * Author       : huzhenhong
  * Date         : 2023-01-09 18:18:24
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-16 00:27:01
+ * LastEditTime : 2023-02-22 15:04:21
  * FilePath     : \\xlog\\src\\PatternFormatter.h
  * Copyright (C) 2023 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
 #include "Str.h"
 #include "fmt/format.h"
-#include "fmt/core.h"
+// #include "fmt/core.h"
 #include "TSCNS.h"
 #include "argutil.h"
 #include "SPSCVarQueueOPT.h"
 #include "StaticLogInfo.h"
 #include <memory>
 
+/*
+    Name	Meaning	                                         Example
+    a	    Weekday	                                         Mon
+    b	    Month name	                                     May
+    C	    Short year	                                     21
+    Y	    Year	                                         2021
+    m	    Month	                                         05
+    d	    Day	                                             03
+    t	    Thread id by default 	                         main thread
+    F	    Nanosecond	                                     796341126
+    f	    Microsecond	                                     796341
+    e	    Millisecond	                                     796
+    S	    Second	                                         09
+    M	    Minute	                                         08
+    H	    Hour	                                         16
+    l	    Log level	                                     INF
+    s	    File base name and line num	                     log_test.cc:48
+    g	    File path and line num	                         /home/raomeng/fmtlog/log_test.cc:48
+    Ymd     Year-Month-Day	                                 2021-05-03
+    HMS     Hour:Minute:Second	                             16:08:09
+    HMSe	Hour:Minute:Second.Millisecond	                 16:08:09.796
+    HMSf	Hour:Minute:Second.Microsecond	                 16:08:09.796341
+    HMSF	Hour:Minute:Second.Nanosecond	                 16:08:09.796341126
+    YmdHMS	Year-Month-Day Hour:Minute:Second	             2021-05-03 16:08:09
+    YmdHMSe	Year-Month-Day Hour:Minute:Second.Millisecond	 2021-05-03 16:08:09.796
+    YmdHMSf	Year-Month-Day Hour:Minute:Second.Microsecond	 2021-05-03 16:08:09.796341
+    YmdHMSF	Year-Month-Day Hour:Minute:Second.Nanosecond	 2021-05-03 16:08:09.796341126
+    func	funciton name                                    main
+
+    Note that using concatenated named args is more efficient than seperated ones, e.g.
+    {YmdHMS} is faster than {Y}-{m}-{d} {H}:{M}:{S}
+*/
 
 class PatternFormatter
 {
   public:
-    PatternFormatter()
+    PatternFormatter(const char* pPattern = "{YmdHMSF} {s:<16} {func} {l} [{t:<6}] ")
     {
         std::cout << "fmtlogDetail()" << std::endl;
 
         m_patternArgVec.reserve(4096);
         m_patternArgVec.resize(parttenArgSize);
 
-        TimeStampCounterWarpper::impl.Reset();
+        TimeStampCounterWarpper::impl.Reset();  // 放在其它地方做行不行？
 
         ResetDate();
-        // fmtlog::setLogFile(stdout);
-        /*
-            Name	Meaning	                                                        Example
-            l	    Log level	                                                    INF
-            s	    File base name and line num	                                    log_test.cc:48
-            g	    File path and line num	                                        /home/raomeng/fmtlog/log_test.cc:48
-            t	    Thread id by default, can be reset by fmt::setThreadName()	    main thread
-            a	    Weekday	                                                        Mon
-            b	    Month name	                                                    May
-            Y	    Year	                                                        2021
-            C	    Short year	                                                    21
-            m	    Month	                                                        05
-            d	    Day	                                                            03
-            H	    Hour	                                                        16
-            M	    Minute	                                                        08
-            S	    Second	                                                        09
-            e	    Millisecond	                                                    796
-            f	    Microsecond	                                                    796341
-            F	    Nanosecond	                                                    796341126
-            Ymd	    Year-Month-Day	                                                2021-05-03
-            HMS	    Hour:Minute:Second	                                            16:08:09
-            HMSe	Hour:Minute:Second.Millisecond	                                16:08:09.796
-            HMSf	Hour:Minute:Second.Microsecond	                                16:08:09.796341
-            HMSF	Hour:Minute:Second.Nanosecond	                                16:08:09.796341126
-            YmdHMS	Year-Month-Day Hour:Minute:Second	                            2021-05-03 16:08:09
-            YmdHMSe	Year-Month-Day Hour:Minute:Second.Millisecond	                2021-05-03 16:08:09.796
-            YmdHMSf	Year-Month-Day Hour:Minute:Second.Microsecond	                2021-05-03 16:08:09.796341
-            YmdHMSF	Year-Month-Day Hour:Minute:Second.Nanosecond	                2021-05-03 16:08:09.796341126
-            func    function name                                                   main
-            Note that using concatenated named args is more efficient than seperated ones, e.g.
-            {YmdHMS} is faster than {Y}-{m}-{d} {H}:{M}:{S}
-        */
-        SetHeaderPattern("{YmdHMSF} {s:<16} {func} {l} [{t:<6}] ");
-        // memset(m_membuf.data(), 0, m_membuf.capacity());
+
+        SetHeaderPattern(pPattern);
     }
 
     ~PatternFormatter()
@@ -123,7 +123,7 @@ class PatternFormatter
         m_logLevel = (const char*)"DBG INF WRN ERR OFF" + (info.m_logLevel << 2);
 
 
-        // m_membuf里追加写入固定日志头，m_patternArgVec 里面的 arg 已经填充了 val
+        // m_membuf 里追加写入固定日志头，m_patternArgVec 里面的 arg 已经填充了 val，且顺序为 pattern 传入的顺序，只有前几个是有效类型，后面的是 none，最后一个是 string 类型
         vformat_to(membuf, m_headerPattern, fmt::basic_format_args(m_patternArgVec.data(), parttenArgSize));
         bodyPos = membuf.size();
 
@@ -138,28 +138,13 @@ class PatternFormatter
             // log once
             membuf.append(fmt::string_view(pData, pEnd - pData));
         }
-
-        // msg = fmt::string_view(m_membuf.data() + headerPos, m_membuf.size() - headerPos);
-
-        // // 可以将单条日志推送上去
-        // if (logCB && info.m_logLevel >= m_minCBLogLevel)
-        // {
-        //     logCB(curTimeNs,
-        //           info.m_logLevel,
-        //           info.GetLocation(),
-        //           info.m_basePosOffset,
-        //           threadName,
-        //           fmt::string_view(m_membuf.data() + headerPos, m_membuf.size() - headerPos),
-        //           bodyPos - headerPos /* ,
-        //            m_fpos + headerPos */
-        //     );
-        // }
     }
 
 
   private:
     void SetHeaderPattern(const char* pattern)
     {
+        // 为什么要delete，因为 m_headerPattern 是 UnNameFormat 里 new[] 生成的，需要自己维护
         if (m_shouldDeallocateHeader)
             delete[] m_headerPattern.data();
 

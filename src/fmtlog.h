@@ -126,7 +126,7 @@ class fmtlog
     //                                    int&                                                     argIdx,
     //                                    std::vector<fmt::basic_format_arg<fmt::format_context>>& args);
 
-    static void                     registerLogInfo(uint32_t&        logId,
+    static void                     RegisterLogInfo(uint32_t&        logId,
                                                     FormatToFn       fn,
                                                     const char*      location,
                                                     const char*      funcName,
@@ -155,11 +155,11 @@ class fmtlog
 
         if (!logId)  // logId 是局部静态变量的引用，任何一条日志首次运行到这里时 logId 均为 0，也就是一定会执行下面的注册流程
         {
-            // 去除命名参数
+            // 去除命名参数，不对命名参数重排序
             auto unnamed_format = UnNameFormat<false>(fmt::string_view(format), nullptr, args...);
 
             // FormatTo<Args...> 是利用 Args... 作为模版参数先实例化一个函数，函数里面做 DecodeArgs 的时候会用到 Args...
-            registerLogInfo(logId, FormatTo<Args...>, location, funcName, level, unnamed_format);
+            RegisterLogInfo(logId, FormatTo<Args...>, location, funcName, level, unnamed_format);
         }
 
         // cstring 需要手动释放内存，因为归根结底就是个指针
@@ -176,7 +176,7 @@ class fmtlog
                 header->logId   = logId;
                 char* pOut      = (char*)(header + 1);  // 第一个 blank 记录着 logId 和 msg 大小
                 *(int64_t*)pOut = tsc;
-                pOut += 8;
+                pOut += 8;  // 跳过 header
                 EncodeArgs<0>(cstringSizes, pOut, std::forward<Args>(args)...);
                 header->push(alloc_size);  // 可以直接在 AllocMsg 里面去初始化size
                 break;
@@ -194,7 +194,7 @@ class fmtlog
     {
         fmt::string_view sv(format);
         auto&&           fmt_args   = fmt::make_format_args(args...);
-        uint32_t         fmt_size   = formatted_size(sv, fmt_args);
+        uint32_t         fmt_size   = FormattedSize(sv, fmt_args);
         uint32_t         alloc_size = 8 + 8 + fmt_size;  // 时戳 + 位置 + 格式化数据
         do
         {
@@ -207,7 +207,7 @@ class fmtlog
                 out += 8;
                 *(const char**)out = location;
                 out += 8;
-                vformat_to(out, sv, fmt_args);
+                VformatTo(out, sv, fmt_args);
                 header->push(alloc_size);
                 break;
             }

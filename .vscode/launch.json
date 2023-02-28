@@ -12,7 +12,7 @@
             ],
             // 以上必须要有
             "environment": [],
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build/bin",
             "stopAtEntry": false,
             "externalConsole": false, // 使用内部终端调试
             "osx": {

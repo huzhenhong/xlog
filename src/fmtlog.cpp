@@ -20,7 +20,7 @@ fmtlog::~fmtlog()
 
 
 // 每条日志最先执行注册操作
-void fmtlog::registerLogInfo(uint32_t&        logId,
+void fmtlog::RegisterLogInfo(uint32_t&        logId,
                              FormatToFn       fn,
                              const char*      location,
                              const char*      funcName,
