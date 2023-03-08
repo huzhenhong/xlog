@@ -189,8 +189,10 @@ void fmtlogDetail::AdjustHeap(size_t i)
 
     while (leftChildIdx < m_allThreadBufVec.size())
     {
-        auto pLeftChild    = m_allThreadBufVec[leftChildIdx].pHeader;
-        auto pRightChild   = m_allThreadBufVec[rightChildIdx].pHeader;
+        auto pLeftChild    = m_allThreadBufVec[leftChildIdx]->msgQueue.Front();
+        auto pRightChild   = m_allThreadBufVec[rightChildIdx]->msgQueue.Front();
+        // auto pLeftChild    = m_allThreadBufVec[leftChildIdx].pHeader;
+        // auto pRightChild   = m_allThreadBufVec[rightChildIdx].pHeader;
         int  smallChildIdx = 0;
 
         // 有右孩子且右孩子比左孩子大
@@ -205,8 +207,10 @@ void fmtlogDetail::AdjustHeap(size_t i)
             smallChildIdx = leftChildIdx;
         }
 
-        auto pSmallChild = m_allThreadBufVec[smallChildIdx].pHeader;
-        auto pCurRoot    = m_allThreadBufVec[curRootIdx].pHeader;
+        auto pSmallChild = m_allThreadBufVec[smallChildIdx]->msgQueue.Front();
+        auto pCurRoot    = m_allThreadBufVec[curRootIdx]->msgQueue.Front();
+        // auto pSmallChild = m_allThreadBufVec[smallChildIdx].pHeader;
+        // auto pCurRoot    = m_allThreadBufVec[curRootIdx].pHeader;
 
 
         if (!pCurRoot ||                                               // 当前线程没有日志需要处理
@@ -248,7 +252,7 @@ void fmtlogDetail::Poll(bool forceFlush)
         std::unique_lock<std::mutex> lock(m_threadBufMtx);
         for (auto threadBuf : m_newThreadBufVec)
         {
-            m_allThreadBufVec.emplace_back(threadBuf);  // pHeader 此时为空
+            m_allThreadBufVec.emplace_back(threadBuf);
         }
         m_newThreadBufVec.clear();
     }
@@ -256,8 +260,8 @@ void fmtlogDetail::Poll(bool forceFlush)
     // 删除退出线程
     for (size_t i = 0; i < m_allThreadBufVec.size(); ++i)
     {
-        auto& node = m_allThreadBufVec[i];
-        if (node.pHeader)
+        auto pHeader = m_allThreadBufVec[i]->msgQueue.Front();
+        if (pHeader)
         {
             // 此时新添加的线程 node.pHeader 必然不为 nullptr
             // 已有线程每次处理后都会指向下一条日志，这里就是对 buf 里还有日志的线程不做处理
@@ -266,16 +270,37 @@ void fmtlogDetail::Poll(bool forceFlush)
 
         // 下面是已经处理完所有日志的线程，但是 msgQueue 为无锁队列，有可能又放入了新的日志
 
-        node.pHeader = node.pThreadBuf->msgQueue.Front();  // 查看有没有新日志
+        pHeader = m_allThreadBufVec[i]->msgQueue.Front();  // 查看有没有新日志
 
-        if (node.pThreadBuf->isThreadExit &&  // 为真说明线程已经退出了
-            !node.pHeader)                    // 为空说明 msgQueue 里没有数据了
+        if (m_allThreadBufVec[i]->isThreadExit &&  // 为真说明线程已经退出了
+            !pHeader)                              // 为空说明 msgQueue 里没有数据了
         {
-            delete node.pThreadBuf;
-            node = m_allThreadBufVec.back();  // 将最后面的 buf 指针放到当前位置
-            m_allThreadBufVec.pop_back();     // 删除最后面的，这样可以避免不必要的拷贝
+            delete m_allThreadBufVec[i];
+            m_allThreadBufVec[i] = m_allThreadBufVec.back();  // 将最后面的 buf 指针放到当前位置
+            m_allThreadBufVec.pop_back();                     // 删除最后面的，这样可以避免不必要的拷贝
             --i;
         }
+
+        // auto& node = m_allThreadBufVec[i];
+        // if (node.pHeader)
+        // {
+        //     // 此时新添加的线程 node.pHeader 必然不为 nullptr
+        //     // 已有线程每次处理后都会指向下一条日志，这里就是对 buf 里还有日志的线程不做处理
+        //     continue;
+        // }
+
+        // // 下面是已经处理完所有日志的线程，但是 msgQueue 为无锁队列，有可能又放入了新的日志
+
+        // node.pHeader = node.pThreadBuf->msgQueue.Front();  // 查看有没有新日志
+
+        // if (node.pThreadBuf->isThreadExit &&  // 为真说明线程已经退出了
+        //     !node.pHeader)                    // 为空说明 msgQueue 里没有数据了
+        // {
+        //     delete node.pThreadBuf;
+        //     node = m_allThreadBufVec.back();  // 将最后面的 buf 指针放到当前位置
+        //     m_allThreadBufVec.pop_back();     // 删除最后面的，这样可以避免不必要的拷贝
+        //     --i;
+        // }
     }
 
     if (m_allThreadBufVec.empty()) return;
@@ -295,7 +320,7 @@ void fmtlogDetail::Poll(bool forceFlush)
     // 最好就是找到一条一条的处理吧
     while (true)
     {
-        auto pHeader = m_allThreadBufVec[0].pHeader;
+        auto pHeader = m_allThreadBufVec[0]->msgQueue.Front();
 
         if (!pHeader ||                       // 队列为空，msg 已经处理完了
                                               // pHeader->logId >= m_allLogInfoVec.size() || // 大于不可能
@@ -305,15 +330,14 @@ void fmtlogDetail::Poll(bool forceFlush)
         }
 
         // 处理当前线程 buf
-        auto pThreadBuf = m_allThreadBufVec[0].pThreadBuf;
+        auto pThreadBuf = m_allThreadBufVec[0];
 
         HandleOneLog(fmt::string_view(pThreadBuf->name, pThreadBuf->nameSize), pHeader);
 
         pThreadBuf->msgQueue.Pop();  // 擦除标记，不是释放
 
-        m_allThreadBufVec[0].pHeader = pThreadBuf->msgQueue.Front();  // 指向下一条日志
+        pThreadBuf->msgQueue.Front();  // 指向下一条日志
 
-        // 再次堆化，确保 m_allThreadBufVec[0].pHeader 为时戳最早的那个线程
         AdjustHeap(0);  // 下沉，再次拿到最小的放在开始位置
     }
 }

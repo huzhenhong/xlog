@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:46
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-03-08 11:24:45
+ * LastEditTime : 2023-03-08 22:04:52
  * FilePath     : \\xlog\\src\\fmtlogDetail.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -52,16 +52,16 @@ struct ThreadBuffer
 };
 
 
-struct HeapNode
-{
-    explicit HeapNode(ThreadBuffer* pBuf)  // explicit 防止隐式转换
-        : pThreadBuf(pBuf)
-    {
-    }
+// struct HeapNode
+// {
+//     explicit HeapNode(ThreadBuffer* pBuf)  // explicit 防止隐式转换
+//         : pThreadBuf(pBuf)
+//     {
+//     }
 
-    ThreadBuffer*                  pThreadBuf = nullptr;
-    const SpScVarQueue::MsgHeader* pHeader    = nullptr;
-};
+//     ThreadBuffer*                  pThreadBuf = nullptr;
+//     const SpScVarQueue::MsgHeader* pHeader    = nullptr;
+// };
 
 
 class fmtlogDetail
@@ -90,7 +90,8 @@ class fmtlogDetail
   public:
     std::mutex                             m_threadBufMtx;
     std::vector<ThreadBuffer*>             m_newThreadBufVec;
-    std::vector<HeapNode>                  m_allThreadBufVec;
+    std::vector<ThreadBuffer*>             m_allThreadBufVec;
+    // std::vector<HeapNode>                  m_allThreadBufVec;
     std::mutex                             m_logInfoMutex;
     std::vector<StaticLogInfo>             m_newLogInfo;
     std::vector<StaticLogInfo>             m_allLogInfoVec;
@@ -115,8 +116,7 @@ struct fmtlogDetailWrapper
 class ThreadLifeMonitor
 {
   public:
-    explicit ThreadLifeMonitor(/* ThreadStopCB callback */)
-    // : m_callback(callback)
+    explicit ThreadLifeMonitor()
     {
         auto tid = std::this_thread::get_id();
         std::cout << *(unsigned int*)&tid << " ThreadLifeMonitor()\n";
@@ -134,13 +134,5 @@ class ThreadLifeMonitor
             fmtlogDetail::m_pThreadBuffer->isThreadExit = true;  // 其实是当前线程退出标识，因为无法得知当前线程什么时候退出的
             fmtlogDetail::m_pThreadBuffer               = nullptr;
         }
-
-        // if (m_callback)
-        // {
-        //     m_callback(*(int*)&tid);
-        // }
     }
-
-    //   private:
-    //     ThreadStopCB m_callback;
 };
