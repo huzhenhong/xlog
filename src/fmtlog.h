@@ -1,6 +1,4 @@
 #pragma once
-// #include "fmt/format.h"
-// #include <type_traits>
 #include "Common.h"
 #include <vector>
 #include <chrono>
@@ -9,14 +7,12 @@
 #include "TSCNS.h"
 #include "SPSCVarQueueOPT.h"
 #include "argutil.h"
-#include <iostream>
 #include "common/ExportMarco.h"
-// #include "FileSink.h"
 
 
 // define FMTLOG_BLOCK=1 if log statment should be blocked when queue is full, instead of discarding the msg
 #ifndef FMTLOG_BLOCK
-    #define FMTLOG_BLOCK 0
+    #define FMTLOG_BLOCK false
 #endif
 
 #define FMTLOG_LEVEL_DBG 0
@@ -110,7 +106,7 @@ class fmtlog
     static inline LogLevel          getLogLevel() noexcept;
 
 
-    static inline bool              checkLogLevel(LogLevel logLevel) noexcept;
+    static inline bool              CheckLogLevel(LogLevel logLevel) noexcept;
 
     // Run a polling thread in the background with a polling interval  in ns
     // Note that user must not call poll() himself when the thread is running
@@ -136,7 +132,7 @@ class fmtlog
     static SpScVarQueue::MsgHeader* AllocMsg(uint32_t size) noexcept;
 
     template<typename... Args>
-    inline void log(uint32_t&                                        logId,
+    inline void Log(uint32_t&                                        logId,
                     int64_t                                          tsc,
                     const char*                                      location,
                     const char*                                      funcName,
@@ -159,7 +155,7 @@ class fmtlog
             auto unnamed_format = UnNameFormat<false>(fmt::string_view(format), nullptr, args...);
 
             // FormatTo<Args...> 是利用 Args... 作为模版参数先实例化一个函数，函数里面做 DecodeArgs 的时候会用到 Args...
-            RegisterLogInfo(logId, FormatTo<Args...>, location, funcName, level, unnamed_format);
+            RegisterLogInfo(logId, Format<Args...>, location, funcName, level, unnamed_format);
         }
 
         // cstring 需要手动释放内存，因为归根结底就是个指针
@@ -187,7 +183,7 @@ class fmtlog
 
     // logOnce 就是没有了 id, 不会重复利用之前的资源
     template<typename... Args>
-    inline void logOnce(const char*                 location,
+    inline void LogOnce(const char*                 location,
                         LogLevel                    level,
                         fmt::format_string<Args...> format,
                         Args&&... args)
@@ -227,7 +223,7 @@ struct FMTLOG_API fmtlogWrapper
 };
 
 
-inline bool fmtlog::checkLogLevel(LogLevel logLevel) noexcept
+inline bool fmtlog::CheckLogLevel(LogLevel logLevel) noexcept
 {
 #ifdef FMTLOG_NO_CHECK_LEVEL
     return true;

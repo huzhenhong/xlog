@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:46
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-14 18:09:21
+ * LastEditTime : 2023-03-08 10:21:33
  * FilePath     : \\xlog\\src\\fmtlogDetail.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -54,11 +54,11 @@ struct ThreadBuffer
 struct HeapNode
 {
     explicit HeapNode(ThreadBuffer* buffer)  // explicit 防止隐式转换
-        : thBuf(buffer)
+        : pThreadBuf(buffer)
     {
     }
 
-    ThreadBuffer*                  thBuf;
+    ThreadBuffer*                  pThreadBuf;
     const SpScVarQueue::MsgHeader* pHeader = nullptr;
 };
 

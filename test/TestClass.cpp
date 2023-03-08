@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:54
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-23 00:42:22
+ * LastEditTime : 2023-03-08 09:59:20
  * FilePath     : \\xlog\\test\\TestClass.cpp
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -21,7 +21,7 @@
 
 void runBenchmark()
 {
-    const int                                      RECORDS = 1000000;
+    const int                                      RECORDS = 10000000;
     // fmtlog::setLogFile("/dev/null", false);
     // fmtlog::closeLogFile();
     // fmtlog::setLogCB(nullptr, WRN);
@@ -131,9 +131,9 @@ int main(int argc, char* argv[])
     logi("2, {}", 2);
 
 
-    fmtlog::poll();
-    // fmtlog::startPollingThread();
-    // runBenchmark();
+    runBenchmark();
+    fmtlog::startPollingThread();
+    // fmtlog::poll();
 
     return 0;
 }

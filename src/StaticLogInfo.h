@@ -4,12 +4,11 @@
  * Author       : huzhenhong
  * Date         : 2022-10-17 15:21:58
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-14 14:34:03
+ * LastEditTime : 2023-03-07 16:04:07
  * FilePath     : \\xlog\\src\\StaticLogInfo.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
-// #include "fmtlog.h"
 #include "Common.h"
 
 

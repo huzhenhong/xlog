@@ -27,8 +27,8 @@ endmacro()
 set(PACKAGE_NAME xlog)
 set(${PACKAGE_NAME}_VERSION 1.0.0.0)
 
-set_and_check(${PACKAGE_NAME}_INCLUDE_DIRS /Users/huzh/github/xlog/install/include)
-set_and_check(${PACKAGE_NAME}_LINK_DIRS /Users/huzh/github/xlog/install/lib)
+set_and_check(${PACKAGE_NAME}_INCLUDE_DIRS /Users/huzh/Documents/github/xlog/install/include)
+set_and_check(${PACKAGE_NAME}_LINK_DIRS /Users/huzh/Documents/github/xlog/install/lib)
 
 file(GLOB_RECURSE LIB_PATHES ${${PACKAGE_NAME}_LINK_DIRS}/*)
 get_filename_component(LIBRARIES ${LIB_PATHES} NAME_WE)

@@ -219,12 +219,12 @@ void fmtlogDetail::poll(bool forceFlush)
         if (node.pHeader) continue;  // 不可能出现吧
 
         // 拿到buf头指针
-        node.pHeader = node.thBuf->varq.Front();
+        node.pHeader = node.pThreadBuf->varq.Front();
 
         // 当前线程buf里没有数据了，且线程需要退出，则删除buf
-        if (!node.pHeader && node.thBuf->shouldDeallocate)
+        if (!node.pHeader && node.pThreadBuf->shouldDeallocate)
         {
-            delete node.thBuf;
+            delete node.pThreadBuf;
             node = m_allThreadBufVec.back();  // 将最后面的buf指针放到当前位置
             m_allThreadBufVec.pop_back();     // 删除最后面的
             --i;
@@ -256,7 +256,7 @@ void fmtlogDetail::poll(bool forceFlush)
             break;
 
         // 处理当前线程 buf
-        auto tb = m_allThreadBufVec[0].thBuf;
+        auto tb = m_allThreadBufVec[0].pThreadBuf;
         handleLog(fmt::string_view(tb->name, tb->nameSize), h);
         tb->varq.Pop();                                   // 擦除标记，不是释放
         m_allThreadBufVec[0].pHeader = tb->varq.Front();  // 指向下一条日志

@@ -4,33 +4,29 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:46
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-14 14:31:53
+ * LastEditTime : 2023-03-08 09:50:27
  * FilePath     : \\xlog\\src\\logger.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
 #include "fmtlog.h"
-// #include "TSCNS.h"
-
-// class fmtlogWrapper;
-// class TimeStampCounterWarpper; 前置声明只是有助于使用该类型来做声明，并不能直接使用
 
 #define __FMTLOG_S1(x) #x
 #define __FMTLOG_S2(x) __FMTLOG_S1(x)
 #define __FMTLOG_LOCATION __FILE__ ":" __FMTLOG_S2(__LINE__)
 
 
-// 注意这里logId是局部静态变量，所以同一条日志只会初始化一次
-// 先判断日志级别应该是防止log和Rdtsc调用的开销
+// 注意这里 logId 是局部静态变量，所以同一条日志只会初始化一次
+// 先判断日志级别应该是防止 log 和 Rdtsc 调用的开销
 #define FMTLOG(level, format, ...)                                     \
     do                                                                 \
     {                                                                  \
         static uint32_t logId = 0;                                     \
                                                                        \
-        if (!fmtlogWrapper::impl.checkLogLevel(level))                 \
+        if (!fmtlogWrapper::impl.CheckLogLevel(level))                 \
             break;                                                     \
                                                                        \
-        fmtlogWrapper::impl.log(logId,                                 \
+        fmtlogWrapper::impl.Log(logId,                                 \
                                 TimeStampCounterWarpper::impl.Rdtsc(), \
                                 __FMTLOG_LOCATION,                     \
                                 __FUNCTION__,                          \
@@ -44,22 +40,22 @@
     {                                                                                         \
         static uint32_t logId   = 0;                                                          \
         static int64_t  limitNs = 0;                                                          \
-        if (!fmtlogWrapper::impl.checkLogLevel(level))                                        \
+        if (!fmtlogWrapper::impl.CheckLogLevel(level))                                        \
             break;                                                                            \
         int64_t tsc = TimeStampCounterWarpper::impl.Rdtsc();                                  \
         int64_t ns  = TimeStampCounterWarpper::impl.Tsc2ns(tsc);                              \
         if (ns < limitNs)                                                                     \
             break;                                                                            \
         limitNs = ns + min_interval;                                                          \
-        fmtlogWrapper::impl.log(logId, tsc, __FMTLOG_LOCATION, level, format, ##__VA_ARGS__); \
+        fmtlogWrapper::impl.Log(logId, tsc, __FMTLOG_LOCATION, level, format, ##__VA_ARGS__); \
     } while (0)
 
 #define FMTLOG_ONCE(level, format, ...)                                               \
     do                                                                                \
     {                                                                                 \
-        if (!fmtlogWrapper::impl.checkLogLevel(level))                                \
+        if (!fmtlogWrapper::impl.CheckLogLevel(level))                                \
             break;                                                                    \
-        fmtlogWrapper::impl.logOnce(__FMTLOG_LOCATION, level, format, ##__VA_ARGS__); \
+        fmtlogWrapper::impl.LogOnce(__FMTLOG_LOCATION, level, format, ##__VA_ARGS__); \
     } while (0)
 
 

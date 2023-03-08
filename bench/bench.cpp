@@ -4,8 +4,8 @@
  * Author       : huzhenhong
  * Date         : 2023-01-06 18:27:57
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-01-06 19:54:13
- * FilePath     : \\FmtLog\\bench\\bench.cpp
+ * LastEditTime : 2023-03-02 15:00:43
+ * FilePath     : \\xlog\\bench\\bench.cpp
  * Copyright (C) 2023 huzhenhong. All rights reserved.
  *************************************************************************************/
 
@@ -17,10 +17,10 @@
 #include "spdlog/async.h"
 // #include "NanoLog/runtime/NanoLogCpp17.h"
 
-namespace GeneratedFunctions
+/* namespace GeneratedFunctions
 {
     size_t numLogIds;
-};
+}; */
 
 struct FmtLogBase
 {
@@ -148,14 +148,14 @@ struct ComplexFormat : public FmtLogBase
 struct SpdlogBase
 {
     SpdlogBase(spdlog::logger* logger)
-        : logger(logger) {}
+        : pLogger(logger) {}
 
     void flush()
     {
-        logger->flush();
+        pLogger->flush();
     }
 
-    spdlog::logger* logger;
+    spdlog::logger* pLogger;
 };
 
 struct SpdlogStaticString : public SpdlogBase
@@ -164,7 +164,7 @@ struct SpdlogStaticString : public SpdlogBase
         : SpdlogBase(logger) {}
     inline void log()
     {
-        SPDLOG_LOGGER_INFO(logger, "Starting backup replica garbage collector thread");
+        SPDLOG_LOGGER_INFO(pLogger, "Starting backup replica garbage collector thread");
     }
 };
 
@@ -174,7 +174,7 @@ struct SpdlogStringConcat : public SpdlogBase
         : SpdlogBase(logger) {}
     inline void log()
     {
-        SPDLOG_LOGGER_INFO(logger, "Opened session with coordinator at {}", "basic+udp:host=192.168.1.140,port=12246");
+        SPDLOG_LOGGER_INFO(pLogger, "Opened session with coordinator at {}", "basic+udp:host=192.168.1.140,port=12246");
     }
 };
 
@@ -184,7 +184,7 @@ struct SpdlogSingleInteger : public SpdlogBase
         : SpdlogBase(logger) {}
     inline void log()
     {
-        SPDLOG_LOGGER_INFO(logger, "Backup storage speeds (min): {} MB/s read", 181);
+        SPDLOG_LOGGER_INFO(pLogger, "Backup storage speeds (min): {} MB/s read", 181);
     }
 };
 
@@ -194,7 +194,7 @@ struct SpdlogTwoIntegers : public SpdlogBase
         : SpdlogBase(logger) {}
     inline void log()
     {
-        SPDLOG_LOGGER_INFO(logger, "buffer has consumed {} bytes of extra storage, current allocation: {} bytes", 1032024, 1016544);
+        SPDLOG_LOGGER_INFO(pLogger, "buffer has consumed {} bytes of extra storage, current allocation: {} bytes", 1032024, 1016544);
     }
 };
 
@@ -204,7 +204,7 @@ struct SpdlogSingleDouble : public SpdlogBase
         : SpdlogBase(logger) {}
     inline void log()
     {
-        SPDLOG_LOGGER_INFO(logger, "Using tombstone ratio balancer with ratio = {}", 0.400000);
+        SPDLOG_LOGGER_INFO(pLogger, "Using tombstone ratio balancer with ratio = {}", 0.400000);
     }
 };
 
@@ -215,7 +215,7 @@ struct SpdlogComplexFormat : public SpdlogBase
     inline void log()
     {
         SPDLOG_LOGGER_INFO(
-            logger,
+            pLogger,
             "Initialized InfUdDriver buffers: {} receive buffers ({} MB), {} transmit buffers ({} MB), took {:.1f} ms",
             50000,
             97,
@@ -226,24 +226,30 @@ struct SpdlogComplexFormat : public SpdlogBase
 };
 
 template<typename T>
-void bench(T o)
+void Bench(T obj)
 {
     const int                                      RECORDS = 10000;
     std::chrono::high_resolution_clock::time_point t0, t1, t2;
     t0 = std::chrono::high_resolution_clock::now();
+
     for (int i = 0; i < RECORDS; ++i)
     {
-        o.log();
+        obj.log();
     }
+
     t1 = std::chrono::high_resolution_clock::now();
-    o.flush();
-    t2           = std::chrono::high_resolution_clock::now();
-    double span1 = std::chrono::duration_cast<std::chrono::duration<double>>(t1 - t0).count();
-    double span2 = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t0).count();
+
+    obj.flush();
+
+    t2 = std::chrono::high_resolution_clock::now();
+
+    double span1 = std::chrono::duration_cast<std::chrono::duration<double>>(t1 - t0).count();  // 单位是s
+    double span2 = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t0).count();  // 单位是s
+
     fmt::print("{}: front-end latency is {:.1f} ns/msg average, throughput  is {:.2f} million msgs/sec average\n",
-               typeid(o).name(),
+               typeid(obj).name(),  // typeid操作符的返回结果是名为type_info的标准库类型的对象的引用
                (span1 / RECORDS) * 1e9,
-               RECORDS / span2 / 1e6);
+               RECORDS / span2 / 1e6);  // 为了计算百万条日制耗时
 }
 
 int main()
@@ -257,12 +263,12 @@ int main()
 
     auto spdlogger = spdlog::basic_logger_st("spdlog", "spdlog.txt", true);
 
-    bench(StaticString());
-    bench(StringConcat());
-    bench(SingleInteger());
-    bench(TwoIntegers());
-    bench(SingleDouble());
-    bench(ComplexFormat());
+    Bench(StaticString());
+    Bench(StringConcat());
+    Bench(SingleInteger());
+    Bench(TwoIntegers());
+    Bench(SingleDouble());
+    Bench(ComplexFormat());
 
     fmt::print("\n");
 
@@ -275,12 +281,12 @@ int main()
 
     // fmt::print("\n");
 
-    bench(SpdlogStaticString(spdlogger.get()));
-    bench(SpdlogStringConcat(spdlogger.get()));
-    bench(SpdlogSingleInteger(spdlogger.get()));
-    bench(SpdlogTwoIntegers(spdlogger.get()));
-    bench(SpdlogSingleDouble(spdlogger.get()));
-    bench(SpdlogComplexFormat(spdlogger.get()));
+    Bench(SpdlogStaticString(spdlogger.get()));
+    Bench(SpdlogStringConcat(spdlogger.get()));
+    Bench(SpdlogSingleInteger(spdlogger.get()));
+    Bench(SpdlogTwoIntegers(spdlogger.get()));
+    Bench(SpdlogSingleDouble(spdlogger.get()));
+    Bench(SpdlogComplexFormat(spdlogger.get()));
 
     return 0;
 }

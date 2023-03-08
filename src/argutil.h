@@ -295,7 +295,7 @@ static inline constexpr char* EncodeArgs(size_t* pCstringSize, char* pOut, Arg&&
         }
         else
         {
-            // 不可简单拷贝说明就是 cstring 或者 容器
+            // 不可简单拷贝说明就是容器, 还有?
             // placement new，使用完后需要手动调用析构
             new (pOut) fmt::remove_cvref_t<Arg>(std::forward<Arg>(arg));
         }
@@ -419,11 +419,11 @@ static inline void DestructArgs(const char** pNeedDestructArgPtrArr)
 
 
 template<typename... Args>
-const char* FormatTo(fmt::string_view                                         format,
-                     const char*                                              pData,
-                     fmt::basic_memory_buffer<char, 10000>&                   out,
-                     int&                                                     argIdx,
-                     std::vector<fmt::basic_format_arg<fmt::format_context>>& argVec)
+const char* Format(fmt::string_view                                         format,
+                   const char*                                              pData,
+                   fmt::basic_memory_buffer<char, 10000>&                   out,
+                   int&                                                     argIdx,
+                   std::vector<fmt::basic_format_arg<fmt::format_context>>& argVec)
 {
     constexpr size_t argNum            = sizeof...(Args);
     constexpr size_t needDestructorNum = fmt::detail::count<IsNeedCallDestructor<Args>()...>();

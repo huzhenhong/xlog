@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2023-01-06 20:03:41
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-26 18:04:28
+ * LastEditTime : 2023-03-02 14:32:14
  * FilePath     : \\xlog\\test\\test_enc_dec_test.cpp
  * Copyright (C) 2023 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -24,7 +24,7 @@ using namespace fmt::literals;
 
 struct MyType
 {
-    // explicit 会阻止编译器自动地调用构造函数或转换函数来创建对象或改变类型，会导致 vector 利用初始化列表初始化失败
+    // explicit 会阻止编译器自动地调用构造函数或转换函数来创建对象或改变类型
     /* explicit */ MyType(int val)
         : value(val)
     {
@@ -105,22 +105,22 @@ void Test(const S& format, Args&&... args)
     auto unnamedFormatStr = UnNameFormat<false>(sv, nullptr, args...);
     fmt::print("namedFormatStr: {}\n", sv);
     fmt::print("unnamedFormatStr: {}\n", unnamedFormatStr);
-    size_t      cstringSizes[1000];  // 记录每个 cstring 的长度，因为其没有类似 size() 的接口获取 自身长度
-    char        buf[1024];
+    size_t      cstringSizes[1000];  // 记录每个 cstring 的长度，因为其没有类似 size() 的接口获取自身长度
+    char        pEncbuf[1024];
     size_t      allocSize = GetArgSize<0>(cstringSizes, args...);
-    const char* pRet      = EncodeArgs<0>(cstringSizes, buf, std::forward<Args>(args)...);
-    assert(pRet - buf == allocSize);
+    const char* pRet      = EncodeArgs<0>(cstringSizes, pEncbuf, std::forward<Args>(args)...);
+    assert(pRet - pEncbuf == allocSize);
 
-    using Context      = fmt::format_context;
-    using MemoryBuffer = fmt::basic_memory_buffer<char, 10000>;
-    MemoryBuffer                                buffer;
-    int                                         argIdx = -1;
-    std::vector<fmt::basic_format_arg<Context>> formatArgVec;
+    // using Context      = fmt::format_context;
+    // using MemoryBuffer = fmt::basic_memory_buffer<char, 10000>;
+    fmt::basic_memory_buffer<char, 10000>                   pDecBuf;
+    int                                                     argIdx = -1;
+    std::vector<fmt::basic_format_arg<fmt::format_context>> formatArgVec;
 
-    pRet = FormatTo<Args...>(unnamedFormatStr, buf, buffer, argIdx, formatArgVec);  // 返回拷贝执行到 buf 的哪里了
-    assert(pRet - buf == allocSize);
+    pRet = Format<Args...>(unnamedFormatStr, pEncbuf, pDecBuf, argIdx, formatArgVec);  // 返回拷贝执行到 buf 的哪里了
+    assert(pRet - pEncbuf == allocSize);
 
-    string_view encDecStr(buffer.data(), buffer.size());
+    string_view encDecStr(pDecBuf.data(), pDecBuf.size());
     fmt::print("encDecStr: {}\n", encDecStr);
     fmt::print("formatedStr: {}\n", formatedStr);
     assert(encDecStr == formatedStr);
