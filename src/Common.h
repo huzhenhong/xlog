@@ -4,12 +4,13 @@
  * Author       : huzhenhong
  * Date         : 2022-10-18 16:44:49
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-14 18:08:55
+ * LastEditTime : 2023-03-08 10:30:57
  * FilePath     : \\xlog\\src\\Common.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
 #include "fmt/format.h"
+#include <functional>
 #include <type_traits>
 
 
@@ -54,3 +55,6 @@ using LogCBFn = std::function<void(int64_t          ns,
                                    fmt::string_view threadName,
                                    fmt::string_view msg,
                                    size_t           bodyOffSet)>;
+
+
+using ThreadStopCB = std::function<void(int threadID)>;

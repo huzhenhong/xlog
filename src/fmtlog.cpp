@@ -111,7 +111,7 @@ void fmtlog::closeLogFile() noexcept
 
 void fmtlog::poll(bool forceFlush)
 {
-    fmtlogDetailWrapper::impl.poll(forceFlush);
+    fmtlogDetailWrapper::impl.Poll(forceFlush);
 }
 
 void fmtlog::setThreadName(const char* name) noexcept

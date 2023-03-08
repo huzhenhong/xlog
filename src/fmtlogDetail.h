@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:46
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-03-08 10:21:33
+ * LastEditTime : 2023-03-08 11:24:45
  * FilePath     : \\xlog\\src\\fmtlogDetail.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -12,6 +12,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include "Common.h"
 #include "Str.h"
 #include "StaticLogInfo.h"
 #include "SPSCVarQueueOPT.h"
@@ -44,22 +45,22 @@ struct ThreadBuffer
         std::cout << "~ThreadBuffer()\n";
     }
 
-    SpScVarQueue varq;
-    bool         shouldDeallocate = false;  // 是否需要在线程退出时释放
-    char         name[32];
+    SpScVarQueue msgQueue;              // 通过 volatile 实现的无锁队列
+    bool         isThreadExit = false;  // 线程是否退出
     size_t       nameSize;
+    char         name[32];
 };
 
 
 struct HeapNode
 {
-    explicit HeapNode(ThreadBuffer* buffer)  // explicit 防止隐式转换
-        : pThreadBuf(buffer)
+    explicit HeapNode(ThreadBuffer* pBuf)  // explicit 防止隐式转换
+        : pThreadBuf(pBuf)
     {
     }
 
-    ThreadBuffer*                  pThreadBuf;
-    const SpScVarQueue::MsgHeader* pHeader = nullptr;
+    ThreadBuffer*                  pThreadBuf = nullptr;
+    const SpScVarQueue::MsgHeader* pHeader    = nullptr;
 };
 
 
@@ -80,9 +81,9 @@ class fmtlogDetail
     void                     PreAllocate();
     void                     startPollingThread(int64_t pollInterval);
     void                     stopPollingThread();
-    void                     handleLog(fmt::string_view threadName, const SpScVarQueue::MsgHeader* header);
+    void                     HandleOneLog(fmt::string_view threadName, const SpScVarQueue::MsgHeader* header);
     void                     AdjustHeap(size_t i);
-    void                     poll(bool forceFlush);
+    void                     Poll(bool forceFlush);
     void                     setLogFile(const char* filename, bool truncate = false);
 
 
@@ -110,26 +111,36 @@ struct fmtlogDetailWrapper
     static fmtlogDetail impl;
 };
 
-class ThreadBufferDestroyer
+
+class ThreadLifeMonitor
 {
   public:
-    explicit ThreadBufferDestroyer()
+    explicit ThreadLifeMonitor(/* ThreadStopCB callback */)
+    // : m_callback(callback)
     {
         auto tid = std::this_thread::get_id();
-        std::cout << *(unsigned int*)&tid << " ThreadBufferDestroyer()\n";
+        std::cout << *(unsigned int*)&tid << " ThreadLifeMonitor()\n";
     }
 
-    void threadBufferCreated() {}
+    void Activate() {}
 
-    ~ThreadBufferDestroyer()
+    ~ThreadLifeMonitor()
     {
         auto tid = std::this_thread::get_id();
-        std::cout << *(unsigned int*)&tid << " ~ThreadBufferDestroyer()\n";
+        std::cout << *(unsigned int*)&tid << " ~ThreadLifeMonitor()\n";
 
         if (fmtlogDetail::m_pThreadBuffer != nullptr)
         {
-            fmtlogDetail::m_pThreadBuffer->shouldDeallocate = true;  // 其实是当前线程退出标识，因为无法得知当前线程什么时候退出的
-            fmtlogDetail::m_pThreadBuffer                   = nullptr;
+            fmtlogDetail::m_pThreadBuffer->isThreadExit = true;  // 其实是当前线程退出标识，因为无法得知当前线程什么时候退出的
+            fmtlogDetail::m_pThreadBuffer               = nullptr;
         }
+
+        // if (m_callback)
+        // {
+        //     m_callback(*(int*)&tid);
+        // }
     }
+
+    //   private:
+    //     ThreadStopCB m_callback;
 };

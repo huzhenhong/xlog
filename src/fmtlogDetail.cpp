@@ -25,7 +25,7 @@ fmtlogDetail::~fmtlogDetail()
 {
     std::cout << "~fmtlogDetail()" << std::endl;
     stopPollingThread();
-    poll(true);
+    Poll(true);
 }
 
 void fmtlogDetail::RegisterLogInfo(uint32_t&        logId,
@@ -50,7 +50,7 @@ SpScVarQueue::MsgHeader* fmtlogDetail::AllocMsg(uint32_t size)
     if (!m_pThreadBuffer)
         PreAllocate();
 
-    return m_pThreadBuffer->varq.AllocMsg(size);  // 当前线程新打印一条日志
+    return m_pThreadBuffer->msgQueue.AllocMsg(size);  // 当前线程新打印一条日志
 }
 
 void fmtlogDetail::PreAllocate()
@@ -77,8 +77,8 @@ void fmtlogDetail::PreAllocate()
     // 这里的用途就是为了在线程退出时会根据
     // fmtlog::threadBuffer->shouldDeallocate = true;
     // 释放 HeapNode 里的 ThreadBuffer，也就是 fmtlog::m_pThreadBuffer
-    thread_local ThreadBufferDestroyer sbc;  // 定义为局部变量自带 static 属性
-    sbc.threadBufferCreated();               // 延迟初始化 threadlocal，static 变量只有在第一次使用时才会初始化
+    thread_local ThreadLifeMonitor monitor;  // 定义为局部变量自带 static 属性
+    monitor.Activate();                      // 延迟初始化 threadlocal，static 变量只有在第一次使用时才会初始化
 
     std::unique_lock<std::mutex> guard(m_threadBufMtx);
     m_newThreadBufVec.push_back(m_pThreadBuffer);
@@ -97,7 +97,7 @@ void fmtlogDetail::startPollingThread(int64_t pollInterval)
                             {
                                 int64_t before = TimeStampCounterWarpper::impl.Rdns();
 
-                                poll(false);
+                                Poll(false);
 
                                 int64_t delay = TimeStampCounterWarpper::impl.Rdns() - before;
 
@@ -106,7 +106,7 @@ void fmtlogDetail::startPollingThread(int64_t pollInterval)
                                     std::this_thread::sleep_for(std::chrono::nanoseconds(pollInterval - delay));
                                 }
                             }
-                            poll(true); });
+                            Poll(true); });
 }
 
 void fmtlogDetail::stopPollingThread()
@@ -119,8 +119,8 @@ void fmtlogDetail::stopPollingThread()
 }
 
 
-void fmtlogDetail::handleLog(fmt::string_view               threadName,
-                             const SpScVarQueue::MsgHeader* pHeader)
+void fmtlogDetail::HandleOneLog(fmt::string_view               threadName,
+                                const SpScVarQueue::MsgHeader* pHeader)
 {
     StaticLogInfo& info = m_allLogInfoVec[pHeader->logId];  // m_allLogInfoVec 都是按顺序 push 的
 
@@ -143,47 +143,88 @@ void fmtlogDetail::handleLog(fmt::string_view               threadName,
     }
 }
 
-// 堆化
+// 堆化，构建小根堆
 void fmtlogDetail::AdjustHeap(size_t i)
 {
-    while (true)
+    // while (true)
+    // {
+    //     size_t minIdx = i;
+
+    //     /*
+    //     整个for循环就是为了找出左右子节点中最小的那个
+    //     i 为父节点
+    //     2 * i + 1 为左子节点
+    //     2 * i + 2 为右子节点
+    //     ch + 1 为右节点，每次都判断　ch < m_allThreadBufVec.size() 不就行了么
+    //     end = std::min(ch + 2, m_allThreadBufVec.size()) 为左右子节点的边界，为了让循环最多只运行两次，真是会想
+    //     ch++ 变成右子节点
+    //     */
+    //     for (size_t ch = i * 2 + 1, end = std::min(ch + 2, m_allThreadBufVec.size());
+    //          ch < end;
+    //          ch++)
+    //     {
+    //         // 比较当前子节点（先左子节点，再右子节点）和父节点
+    //         auto pChild = m_allThreadBufVec[ch].pHeader;
+    //         auto pRoot  = m_allThreadBufVec[minIdx].pHeader;
+
+    //         if (pChild &&                                            // 子节点有日志需要处理
+    //             (!pRoot ||                                           // !pRoot 现在指向第一个线程 buf，判断是否还有日志需要处理，没有了就需要下沉
+    //              *(int64_t*)(pChild + 1) < *(int64_t*)(pRoot + 1)))  // 子节点时戳小需要下沉
+    //         {
+    //             minIdx = ch;  // 最小索引可能先置为左子节点，再和右子节点比较后变为右子节点
+    //         }
+    //     }
+
+    //     if (minIdx == i)
+    //         break;
+
+    //     // 交换父节点和子节点，继续下沉
+    //     std::swap(m_allThreadBufVec[i], m_allThreadBufVec[minIdx]);
+    //     i = minIdx;
+    // }
+
+    int curRootIdx    = i;
+    int leftChildIdx  = 2 * i + 1;  // 当前节点的第一个左孩子
+    int rightChildIdx = 2 * i + 2;  // 当前节点的第一个右孩子（最后一个非叶子结点不一定有）
+
+    while (leftChildIdx < m_allThreadBufVec.size())
     {
-        size_t min_i = i;
+        auto pLeftChild    = m_allThreadBufVec[leftChildIdx].pHeader;
+        auto pRightChild   = m_allThreadBufVec[rightChildIdx].pHeader;
+        int  smallChildIdx = 0;
 
-        /*
-        整个for循环就是为了找出左右子节点中最小的那个
-        i 为父节点
-        2 * i + 1 为左子节点
-        2 * i + 2 为右子节点
-        ch+1 为右节点，每次都判断　ch < m_allThreadBufVec.size() 不就行了么
-        end = std::min(ch + 2, m_allThreadBufVec.size()) 为左右子节点的边界，为了让循环最多只运行两次，真是会想
-        ch++ 变成右子节点
-        */
-        for (size_t ch = i * 2 + 1, end = std::min(ch + 2, m_allThreadBufVec.size());
-             ch < end;
-             ch++)
+        // 有右孩子且右孩子比左孩子大
+        if (rightChildIdx < m_allThreadBufVec.size() &&
+            pRightChild &&                                               // 有日志待处理
+            *(int64_t*)(pRightChild + 1) < *(int64_t*)(pLeftChild + 1))  // 右子节点时戳更小
         {
-            // 比较当前子节点（先左子节点，再右子节点）和父节点
-            auto h_ch  = m_allThreadBufVec[ch].pHeader;
-            auto h_min = m_allThreadBufVec[min_i].pHeader;
-
-            // h_ch 子节点有日志需要处理
-            // !h_min 现在指向第一个线程buf，判断是否还有日志需要处理，没有了就需要下沉
-            // *(int64_t*)(h_ch + 1) < *(int64_t*)(h_min + 1)) 子节点时戳小需要下沉
-            if (h_ch && (!h_min || *(int64_t*)(h_ch + 1) < *(int64_t*)(h_min + 1)))
-                min_i = ch;  // 最小索引可能先置为左子节点，再和右子节点比较后变为右子节点
+            smallChildIdx = rightChildIdx;
+        }
+        else
+        {
+            smallChildIdx = leftChildIdx;
         }
 
-        if (min_i == i)
-            break;
+        auto pSmallChild = m_allThreadBufVec[smallChildIdx].pHeader;
+        auto pCurRoot    = m_allThreadBufVec[curRootIdx].pHeader;
 
-        // 交换父节点和子节点，继续下沉
-        std::swap(m_allThreadBufVec[i], m_allThreadBufVec[min_i]);
-        i = min_i;
+
+        if (!pCurRoot ||                                               // 当前线程没有日志需要处理
+            *(int64_t*)(pCurRoot + 1) > *(int64_t*)(pSmallChild + 1))  // 当前节点比子节点时戳大
+        {
+            std::swap(m_allThreadBufVec[curRootIdx], m_allThreadBufVec[smallChildIdx]);
+            curRootIdx    = smallChildIdx;
+            leftChildIdx  = 2 * curRootIdx + 1;
+            rightChildIdx = 2 * curRootIdx + 2;
+        }
+        else
+        {
+            break;
+        }
     }
 }
 
-void fmtlogDetail::poll(bool forceFlush)
+void fmtlogDetail::Poll(bool forceFlush)
 {
     TimeStampCounterWarpper::impl.Calibrate();  // 持续校准
 
@@ -207,7 +248,7 @@ void fmtlogDetail::poll(bool forceFlush)
         std::unique_lock<std::mutex> lock(m_threadBufMtx);
         for (auto threadBuf : m_newThreadBufVec)
         {
-            m_allThreadBufVec.emplace_back(threadBuf);
+            m_allThreadBufVec.emplace_back(threadBuf);  // pHeader 此时为空
         }
         m_newThreadBufVec.clear();
     }
@@ -216,17 +257,23 @@ void fmtlogDetail::poll(bool forceFlush)
     for (size_t i = 0; i < m_allThreadBufVec.size(); ++i)
     {
         auto& node = m_allThreadBufVec[i];
-        if (node.pHeader) continue;  // 不可能出现吧
+        if (node.pHeader)
+        {
+            // 此时新添加的线程 node.pHeader 必然不为 nullptr
+            // 已有线程每次处理后都会指向下一条日志，这里就是对 buf 里还有日志的线程不做处理
+            continue;
+        }
 
-        // 拿到buf头指针
-        node.pHeader = node.pThreadBuf->varq.Front();
+        // 下面是已经处理完所有日志的线程，但是 msgQueue 为无锁队列，有可能又放入了新的日志
 
-        // 当前线程buf里没有数据了，且线程需要退出，则删除buf
-        if (!node.pHeader && node.pThreadBuf->shouldDeallocate)
+        node.pHeader = node.pThreadBuf->msgQueue.Front();  // 查看有没有新日志
+
+        if (node.pThreadBuf->isThreadExit &&  // 为真说明线程已经退出了
+            !node.pHeader)                    // 为空说明 msgQueue 里没有数据了
         {
             delete node.pThreadBuf;
-            node = m_allThreadBufVec.back();  // 将最后面的buf指针放到当前位置
-            m_allThreadBufVec.pop_back();     // 删除最后面的
+            node = m_allThreadBufVec.back();  // 将最后面的 buf 指针放到当前位置
+            m_allThreadBufVec.pop_back();     // 删除最后面的，这样可以避免不必要的拷贝
             --i;
         }
     }
@@ -248,20 +295,25 @@ void fmtlogDetail::poll(bool forceFlush)
     // 最好就是找到一条一条的处理吧
     while (true)
     {
-        auto h = m_allThreadBufVec[0].pHeader;
-        // !h 表示处理完了
-        // h->logId >= m_allLogInfoVec.size() 这不可能吧
-        // *(int64_t*)(h + 1) >= tsc 时钟跳变，但是就算本轮退出日志的真是时戳也还是不准
-        if (!h || h->logId >= m_allLogInfoVec.size() || *(int64_t*)(h + 1) >= tsc)  // header 之后保存着时戳，检测时钟跳变
+        auto pHeader = m_allThreadBufVec[0].pHeader;
+
+        if (!pHeader ||                       // 队列为空，msg 已经处理完了
+                                              // pHeader->logId >= m_allLogInfoVec.size() || // 大于不可能
+            *(int64_t*)(pHeader + 1) >= tsc)  // header 之后保存着时戳，时钟跳变，只能重头堆化了，跳变错误的日志只能让它错下去，只保证日志文件里时戳有序
+        {
             break;
+        }
 
         // 处理当前线程 buf
-        auto tb = m_allThreadBufVec[0].pThreadBuf;
-        handleLog(fmt::string_view(tb->name, tb->nameSize), h);
-        tb->varq.Pop();                                   // 擦除标记，不是释放
-        m_allThreadBufVec[0].pHeader = tb->varq.Front();  // 指向下一条日志
+        auto pThreadBuf = m_allThreadBufVec[0].pThreadBuf;
 
-        // 堆从小到大排序，确保 m_allThreadBufVec[0].pHeader 为时戳最早的那个线程
+        HandleOneLog(fmt::string_view(pThreadBuf->name, pThreadBuf->nameSize), pHeader);
+
+        pThreadBuf->msgQueue.Pop();  // 擦除标记，不是释放
+
+        m_allThreadBufVec[0].pHeader = pThreadBuf->msgQueue.Front();  // 指向下一条日志
+
+        // 再次堆化，确保 m_allThreadBufVec[0].pHeader 为时戳最早的那个线程
         AdjustHeap(0);  // 下沉，再次拿到最小的放在开始位置
     }
 }
