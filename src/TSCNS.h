@@ -23,7 +23,7 @@ class TimeStampCounter
     }
 
     void Reset(int64_t calibrateDurationNs = 20'000'000,  // 20ms
-               int64_t calibateIntervalNs  = 3 * 1000'000'000)
+               int64_t calibateIntervalNs  = 3 * 100'000'000)
     {
         m_calibateIntervalNs = calibateIntervalNs;
 

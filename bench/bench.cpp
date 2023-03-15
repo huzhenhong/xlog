@@ -4,13 +4,14 @@
  * Author       : huzhenhong
  * Date         : 2023-01-06 18:27:57
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-03-02 15:00:43
+ * LastEditTime : 2023-03-15 15:48:54
  * FilePath     : \\xlog\\bench\\bench.cpp
  * Copyright (C) 2023 huzhenhong. All rights reserved.
  *************************************************************************************/
 
 // #include <bits/stdc++.h>
 #include <chrono>
+#include "fmtlog.h"
 #include "logger.h"
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h"
@@ -26,7 +27,8 @@ struct FmtLogBase
 {
     void flush()
     {
-        fmtlog::poll(true);
+        // fmtlog::poll(true);
+        fmtlogWrapper::impl.poll(true);
     }
 };
 
@@ -254,9 +256,9 @@ void Bench(T obj)
 
 int main()
 {
-    fmtlog::setLogFile("fmtlog.txt", true);
-    fmtlog::setHeaderPattern("[{YmdHMSe}] [fmtlog] [{l}] [{s}] ");
-    fmtlog::preallocate();
+    fmtlogWrapper::impl.setLogFile("fmtlog.txt", true);
+    fmtlogWrapper::impl.setHeaderPattern("[{YmdHMSe}] [fmtlog] [{l}] [{s}] ");
+    fmtlogWrapper::impl.preallocate();
 
     // NanoLog::setLogFile("nanalog.bin");
     // NanoLog::preallocate();

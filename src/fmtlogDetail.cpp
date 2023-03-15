@@ -23,9 +23,16 @@ fmtlogDetail::fmtlogDetail()
 
 fmtlogDetail::~fmtlogDetail()
 {
-    std::cout << "~fmtlogDetail()" << std::endl;
+    std::cout << "000" << std::endl;
     stopPollingThread();
-    Poll(true);
+    // std::cout << "111" << std::endl;
+    // Poll(true);
+    std::cout << "~fmtlogDetail()" << std::endl;
+}
+
+void fmtlogDetail::SetHeaderPattern(const char* pPattern)
+{
+    m_patternFormaterSptr->SetHeaderPattern(pPattern);
 }
 
 void fmtlogDetail::RegisterLogInfo(uint32_t&        logId,
@@ -106,6 +113,7 @@ void fmtlogDetail::startPollingThread(int64_t pollInterval)
                                     std::this_thread::sleep_for(std::chrono::nanoseconds(pollInterval - delay));
                                 }
                             }
+
                             Poll(true); });
 }
 
@@ -131,58 +139,21 @@ void fmtlogDetail::HandleOneLog(fmt::string_view               threadName,
     m_patternFormaterSptr->Format(threadName, pHeader, info, m_membuf, logTimeNs, bodyPos);
 
     // 可以将单条日志推送上去
-    if (logCB && info.m_logLevel >= m_minCBLogLevel)
+    if (m_logCB && info.m_logLevel >= m_minCBLogLevel)
     {
-        logCB(logTimeNs,
-              info.m_logLevel,
-              info.GetLocation(),
-              info.GetFuncName(),
-              threadName,
-              fmt::string_view(m_membuf.data() + headPos, m_membuf.size() - headPos),
-              bodyPos - headPos);
+        m_logCB(logTimeNs,
+                info.m_logLevel,
+                info.GetLocation(),
+                info.GetFuncName(),
+                threadName,
+                fmt::string_view(m_membuf.data() + headPos, m_membuf.size() - headPos),
+                bodyPos - headPos);
     }
 }
 
-// 堆化，构建小根堆
+
 void fmtlogDetail::AdjustHeap(size_t i)
 {
-    // while (true)
-    // {
-    //     size_t minIdx = i;
-
-    //     /*
-    //     整个for循环就是为了找出左右子节点中最小的那个
-    //     i 为父节点
-    //     2 * i + 1 为左子节点
-    //     2 * i + 2 为右子节点
-    //     ch + 1 为右节点，每次都判断　ch < m_allThreadBufVec.size() 不就行了么
-    //     end = std::min(ch + 2, m_allThreadBufVec.size()) 为左右子节点的边界，为了让循环最多只运行两次，真是会想
-    //     ch++ 变成右子节点
-    //     */
-    //     for (size_t ch = i * 2 + 1, end = std::min(ch + 2, m_allThreadBufVec.size());
-    //          ch < end;
-    //          ch++)
-    //     {
-    //         // 比较当前子节点（先左子节点，再右子节点）和父节点
-    //         auto pChild = m_allThreadBufVec[ch].pHeader;
-    //         auto pRoot  = m_allThreadBufVec[minIdx].pHeader;
-
-    //         if (pChild &&                                            // 子节点有日志需要处理
-    //             (!pRoot ||                                           // !pRoot 现在指向第一个线程 buf，判断是否还有日志需要处理，没有了就需要下沉
-    //              *(int64_t*)(pChild + 1) < *(int64_t*)(pRoot + 1)))  // 子节点时戳小需要下沉
-    //         {
-    //             minIdx = ch;  // 最小索引可能先置为左子节点，再和右子节点比较后变为右子节点
-    //         }
-    //     }
-
-    //     if (minIdx == i)
-    //         break;
-
-    //     // 交换父节点和子节点，继续下沉
-    //     std::swap(m_allThreadBufVec[i], m_allThreadBufVec[minIdx]);
-    //     i = minIdx;
-    // }
-
     int curRootIdx    = i;
     int leftChildIdx  = 2 * i + 1;  // 当前节点的第一个左孩子
     int rightChildIdx = 2 * i + 2;  // 当前节点的第一个右孩子（最后一个非叶子结点不一定有）
@@ -191,8 +162,6 @@ void fmtlogDetail::AdjustHeap(size_t i)
     {
         auto pLeftChild    = m_allThreadBufVec[leftChildIdx]->msgQueue.Front();
         auto pRightChild   = m_allThreadBufVec[rightChildIdx]->msgQueue.Front();
-        // auto pLeftChild    = m_allThreadBufVec[leftChildIdx].pHeader;
-        // auto pRightChild   = m_allThreadBufVec[rightChildIdx].pHeader;
         int  smallChildIdx = 0;
 
         // 有右孩子且右孩子比左孩子大
@@ -209,9 +178,6 @@ void fmtlogDetail::AdjustHeap(size_t i)
 
         auto pSmallChild = m_allThreadBufVec[smallChildIdx]->msgQueue.Front();
         auto pCurRoot    = m_allThreadBufVec[curRootIdx]->msgQueue.Front();
-        // auto pSmallChild = m_allThreadBufVec[smallChildIdx].pHeader;
-        // auto pCurRoot    = m_allThreadBufVec[curRootIdx].pHeader;
-
 
         if (!pCurRoot ||                                               // 当前线程没有日志需要处理
             *(int64_t*)(pCurRoot + 1) > *(int64_t*)(pSmallChild + 1))  // 当前节点比子节点时戳大
@@ -280,39 +246,17 @@ void fmtlogDetail::Poll(bool forceFlush)
             m_allThreadBufVec.pop_back();                     // 删除最后面的，这样可以避免不必要的拷贝
             --i;
         }
-
-        // auto& node = m_allThreadBufVec[i];
-        // if (node.pHeader)
-        // {
-        //     // 此时新添加的线程 node.pHeader 必然不为 nullptr
-        //     // 已有线程每次处理后都会指向下一条日志，这里就是对 buf 里还有日志的线程不做处理
-        //     continue;
-        // }
-
-        // // 下面是已经处理完所有日志的线程，但是 msgQueue 为无锁队列，有可能又放入了新的日志
-
-        // node.pHeader = node.pThreadBuf->msgQueue.Front();  // 查看有没有新日志
-
-        // if (node.pThreadBuf->isThreadExit &&  // 为真说明线程已经退出了
-        //     !node.pHeader)                    // 为空说明 msgQueue 里没有数据了
-        // {
-        //     delete node.pThreadBuf;
-        //     node = m_allThreadBufVec.back();  // 将最后面的 buf 指针放到当前位置
-        //     m_allThreadBufVec.pop_back();     // 删除最后面的，这样可以避免不必要的拷贝
-        //     --i;
-        // }
     }
 
     if (m_allThreadBufVec.empty()) return;
 
     // build heap，小顶堆
     // 最后一个非叶子节点（size / 2 - 1）
-    // for (int i = m_allThreadBufVec.size() / 2; i >= 0; i--)
     for (int i = m_allThreadBufVec.size() / 2 - 1; i >= 0; --i)
     {
         AdjustHeap(i);
     }
-    // 现在 m_allThreadBufVec[0].pHeader 是最小的
+    // 现在 m_allThreadBufVec[0]->msgQueue.Front() 是最小的
 
     // 这里没有采用先排好序再一次性处理的原因就是因为排序数组不是固定的
     // 当前线程的第2条日志可能比其余线程的第1条日志时间都要早
@@ -323,7 +267,7 @@ void fmtlogDetail::Poll(bool forceFlush)
         auto pHeader = m_allThreadBufVec[0]->msgQueue.Front();
 
         if (!pHeader ||                       // 队列为空，msg 已经处理完了
-                                              // pHeader->logId >= m_allLogInfoVec.size() || // 大于不可能
+                                              // pHeader->logId >= m_allLogInfoVec.size() ||  // 大于不可能
             *(int64_t*)(pHeader + 1) >= tsc)  // header 之后保存着时戳，时钟跳变，只能重头堆化了，跳变错误的日志只能让它错下去，只保证日志文件里时戳有序
         {
             break;
@@ -342,31 +286,34 @@ void fmtlogDetail::Poll(bool forceFlush)
     }
 }
 
-void fmtlogDetail::setLogFile(const char* filename, bool truncate)
+// void fmtlogDetail::setLogFile(const char* filename, bool truncate)
+// {
+//     m_fileSinkSptr = std::make_shared<FileSink>("fmtlog.txt", true);
+
+//     fmtlogDetailWrapper::impl.m_logCB = [fileSinkSptr = m_fileSinkSptr](int64_t          ns,
+//                                                                         LogLevel         level,
+//                                                                         fmt::string_view location,
+//                                                                         fmt::string_view funcname,
+//                                                                         fmt::string_view threadName,
+//                                                                         fmt::string_view msg,
+//                                                                         size_t           bodyOffSet)
+//     {
+//         // auto head = fmt::string_view(msg.data(), bodyOffSet);
+//         // auto body = fmt::string_view(msg.data() + bodyOffSet, msg.size() - bodyOffSet);
+//         fileSinkSptr->Sink(level, msg);
+//     };
+// }
+
+// void fmtlogDetail::setLogFile(FILE* fp, bool manageFp)
+// {
+// }
+
+void fmtlogDetail::SetLogCB(LogCBFn logCB, LogLevel minCBLogLevel)
 {
-    m_fileSinkSptr = std::make_shared<FileSink>("fmtlog.txt", true);
-
-    // fmtlogDetailWrapper::impl.logCB = std::bind(&fmtlog::LogCB,
-    //                                             this,
-    //                                             std::placeholders::_1,
-    //                                             std::placeholders::_2,
-    //                                             std::placeholders::_3,
-    //                                             std::placeholders::_4,
-    //                                             std::placeholders::_5,
-    //                                             std::placeholders::_6,
-    //                                             std::placeholders::_7);
-
-    fmtlogDetailWrapper::impl.logCB = [m_fileSinkSptr = m_fileSinkSptr](int64_t          ns,
-                                                                        LogLevel         level,
-                                                                        fmt::string_view location,
-                                                                        fmt::string_view funcname,
-                                                                        // size_t           basePos,
-                                                                        fmt::string_view threadName,
-                                                                        fmt::string_view msg,
-                                                                        size_t           bodyOffSet)
-    {
-        // auto head = fmt::string_view(msg.data(), bodyOffSet);
-        // auto body = fmt::string_view(msg.data() + bodyOffSet, msg.size() - bodyOffSet);
-        m_fileSinkSptr->Sink(level, msg);
-    };
+    m_logCB         = logCB;
+    m_minCBLogLevel = minCBLogLevel;
 }
+
+// void fmtlogDetail::SetFlushDelay(int64_t ns) noexcept
+// {
+// }

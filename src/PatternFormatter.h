@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2023-01-09 18:18:24
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-03-07 19:16:52
+ * LastEditTime : 2023-03-15 16:27:17
  * FilePath     : \\xlog\\src\\PatternFormatter.h
  * Copyright (C) 2023 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -60,8 +60,6 @@ class PatternFormatter
 
         m_patternArgVec.reserve(4096);
         m_patternArgVec.resize(parttenArgSize);
-
-        TimeStampCounterWarpper::impl.Reset();  // 放在其它地方做行不行？
 
         ResetDate();
 
@@ -140,9 +138,7 @@ class PatternFormatter
         }
     }
 
-
-  private:
-    void SetHeaderPattern(const char* pattern)
+    void SetHeaderPattern(const char* pPattern)
     {
         // 为什么要delete，因为 m_headerPattern 是 UnNameFormat 里 new[] 生成的，需要自己维护
         if (m_shouldDeallocateHeader)
@@ -184,7 +180,7 @@ class PatternFormatter
         // s 在罗列的参数里的索引是 14， 在pattern 中的位置是第 1
         // YmdHMSF 在罗列的参数里的索引是 24， 在pattern 中的位置是第 0
         using namespace fmt::literals;
-        m_headerPattern = UnNameFormat<true>(pattern,
+        m_headerPattern = UnNameFormat<true>(pPattern,
                                              m_reorderIdx,
                                              "a"_a       = "",
                                              "b"_a       = "",
@@ -214,7 +210,7 @@ class PatternFormatter
                                              "func"_a    = "");
 
         // 如果有命名参数, 会对"pattern"进行修改, 需要对其进行释放
-        m_shouldDeallocateHeader = m_headerPattern.data() != pattern;
+        m_shouldDeallocateHeader = m_headerPattern.data() != pPattern;
 
         // 确定参数类型，占个坑，因为后面的setArgVal只是设置值，没有改变参数类型和占用内存大小
         // 没有的话会导致后面vformat_to时崩溃，特别是后面也没有setArgVal再手动设置时间戳
@@ -247,6 +243,7 @@ class PatternFormatter
         SetArg<25>(fmt::string_view());                       // func	    funciton name                                    main
     }
 
+  private:
     template<size_t I, typename T>
     inline void SetArg(const T& arg)
     {

@@ -8,7 +8,7 @@ class SpScVarQueue
   public:
     struct MsgHeader
     {
-        inline void push(uint32_t sz)
+        inline void Push(uint32_t sz)
         {
             *(volatile uint32_t*)&size = sz + sizeof(MsgHeader);  // 没必要 volatile 吧
         }

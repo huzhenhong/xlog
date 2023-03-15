@@ -4,14 +4,13 @@
  * Author       : huzhenhong
  * Date         : 2022-10-18 16:44:49
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-03-08 10:30:57
+ * LastEditTime : 2023-03-14 15:42:58
  * FilePath     : \\xlog\\src\\Common.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
 #include "fmt/format.h"
 #include <functional>
-#include <type_traits>
 
 
 #ifdef _WIN32
@@ -36,17 +35,6 @@ using FormatToFn = const char* (*)(fmt::string_view                             
                                    fmt::basic_memory_buffer<char, 10000>&                   out,
                                    int&                                                     argIdx,
                                    std::vector<fmt::basic_format_arg<fmt::format_context>>& args);
-
-
-// using LogCBFn = void (*)(int64_t          ns,
-//                          LogLevel         level,
-//                          fmt::string_view location,
-//                          size_t           basePos,
-//                          fmt::string_view threadName,
-//                          fmt::string_view msg,
-//                          size_t           bodyPos /* ,
-//                           size_t           logFilePos */
-// );
 
 using LogCBFn = std::function<void(int64_t          ns,
                                    LogLevel         level,

@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:46
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-03-08 22:04:52
+ * LastEditTime : 2023-03-15 17:23:30
  * FilePath     : \\xlog\\src\\fmtlogDetail.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -52,23 +52,13 @@ struct ThreadBuffer
 };
 
 
-// struct HeapNode
-// {
-//     explicit HeapNode(ThreadBuffer* pBuf)  // explicit 防止隐式转换
-//         : pThreadBuf(pBuf)
-//     {
-//     }
-
-//     ThreadBuffer*                  pThreadBuf = nullptr;
-//     const SpScVarQueue::MsgHeader* pHeader    = nullptr;
-// };
-
-
 class fmtlogDetail
 {
   public:
     fmtlogDetail();
     ~fmtlogDetail();
+
+    void                     SetHeaderPattern(const char* pPattern);
 
     void                     RegisterLogInfo(uint32_t&        logId,
                                              FormatToFn       fn,
@@ -78,32 +68,56 @@ class fmtlogDetail
                                              fmt::string_view fmtString);
 
     SpScVarQueue::MsgHeader* AllocMsg(uint32_t size);
-    void                     PreAllocate();
-    void                     startPollingThread(int64_t pollInterval);
-    void                     stopPollingThread();
-    void                     HandleOneLog(fmt::string_view threadName, const SpScVarQueue::MsgHeader* header);
-    void                     AdjustHeap(size_t i);
-    void                     Poll(bool forceFlush);
-    void                     setLogFile(const char* filename, bool truncate = false);
 
+    void                     PreAllocate();
+
+    void                     startPollingThread(int64_t pollInterval);
+
+    void                     stopPollingThread();
+
+    void                     HandleOneLog(fmt::string_view threadName, const SpScVarQueue::MsgHeader* header);
+
+    void                     AdjustHeap(size_t i);
+
+    void                     Poll(bool forceFlush);
+
+    // void                     setLogFile(const char* filename, bool truncate = false);
+
+    // void                     setLogFile(FILE* fp, bool manageFp);
+
+    void                     SetLogCB(LogCBFn logCB, LogLevel minCBLogLevel);
+
+    // void                     SetFlushDelay(int64_t ns) noexcept;
 
   public:
-    std::mutex                             m_threadBufMtx;
-    std::vector<ThreadBuffer*>             m_newThreadBufVec;
-    std::vector<ThreadBuffer*>             m_allThreadBufVec;
-    // std::vector<HeapNode>                  m_allThreadBufVec;
-    std::mutex                             m_logInfoMutex;
-    std::vector<StaticLogInfo>             m_newLogInfo;
-    std::vector<StaticLogInfo>             m_allLogInfoVec;
-    LogCBFn                                logCB = nullptr;
-    LogLevel                               m_minCBLogLevel;
-    fmt::basic_memory_buffer<char, 10000>  m_membuf;  // 日志写入的地方
-    volatile bool                          m_isThreadRunning = false;
-    std::thread                            m_thr;
     static FAST_THREAD_LOCAL ThreadBuffer* m_pThreadBuffer;  // __thread 时只能修饰static成员变量
-    std::shared_ptr<ISink>                 m_fileSinkSptr = nullptr;
 
-    PatternFormatterSptr                   m_patternFormaterSptr;
+  private:
+    std::mutex                            m_threadBufMtx;
+
+    std::vector<ThreadBuffer*>            m_newThreadBufVec;
+
+    std::vector<ThreadBuffer*>            m_allThreadBufVec;
+
+    std::mutex                            m_logInfoMutex;
+
+    std::vector<StaticLogInfo>            m_newLogInfo;
+
+    std::vector<StaticLogInfo>            m_allLogInfoVec;
+
+    LogCBFn                               m_logCB = nullptr;
+
+    LogLevel                              m_minCBLogLevel;
+
+    fmt::basic_memory_buffer<char, 10000> m_membuf;  // 日志写入的地方
+
+    volatile bool                         m_isThreadRunning = false;
+
+    std::thread                           m_thr;
+
+    // std::shared_ptr<ISink>                m_fileSinkSptr = nullptr;
+
+    PatternFormatterSptr                  m_patternFormaterSptr;
 };
 
 
@@ -131,7 +145,7 @@ class ThreadLifeMonitor
 
         if (fmtlogDetail::m_pThreadBuffer != nullptr)
         {
-            fmtlogDetail::m_pThreadBuffer->isThreadExit = true;  // 其实是当前线程退出标识，因为无法得知当前线程什么时候退出的
+            fmtlogDetail::m_pThreadBuffer->isThreadExit = true;
             fmtlogDetail::m_pThreadBuffer               = nullptr;
         }
     }

@@ -4,14 +4,13 @@
  * Author       : huzhenhong
  * Date         : 2022-10-19 11:00:55
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-02-18 22:05:15
+ * LastEditTime : 2023-03-15 19:34:03
  * FilePath     : \\xlog\\src\\FileSink.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #pragma once
 #include "ISink.h"
 #include "TSCNS.h"
-#include <cstddef>
 
 
 class FileSink : public ISink
@@ -24,13 +23,13 @@ class FileSink : public ISink
 
     ~FileSink()
     {
-        Flush();  // 防止启动就退出日志不落盘
+        // Flush();  // 防止启动就退出日志不落盘
+        Close();
+        std::cout << "~FileSink()" << std::endl;
     }
 
     void Sink(LogLevel level, fmt::string_view msg) override
     {
-        // std::cout << msg.data() << std::endl;
-
         if (level >= m_flushLevel)
         {
             m_membuf.append(msg);
@@ -76,19 +75,15 @@ class FileSink : public ISink
   private:
     bool Open(const char* filename, bool truncate)
     {
-        FILE* newFp = fopen(filename, truncate ? "w" : "a");
-        if (!newFp)
+        m_outputFp = fopen(filename, truncate ? "w" : "a");
+        if (!m_outputFp)
         {
             std::string err = fmt::format("Unable to open file: {}: {}", filename, strerror(errno));
             fmt::detail::throw_format_error(err.c_str());
         }
 
-        setbuf(newFp, nullptr);
-        m_fpos = ftell(newFp);
-
-        Close();  // ?
-
-        m_outputFp   = newFp;
+        setbuf(m_outputFp, nullptr);
+        m_fpos       = ftell(m_outputFp);
         m_isManageFp = true;
     }
 
@@ -96,19 +91,20 @@ class FileSink : public ISink
     {
         if (m_membuf.size())
         {
-            Flush();
+            Flush(true);
         }
 
+        int ret = 0;
         if (m_isManageFp)
         {
-            fclose(m_outputFp);
+            ret = fclose(m_outputFp);
         }
 
         m_outputFp   = nullptr;
         m_isManageFp = false;
     }
 
-    void Flush()
+    void Flush(bool forceFlush = false)
     {
         if (m_membuf.size() == 0)
             return;
@@ -117,7 +113,7 @@ class FileSink : public ISink
         {
             fwrite(m_membuf.data(), 1, m_membuf.size(), m_outputFp);
 
-            if (!m_isManageFp)
+            if (!m_isManageFp || forceFlush)
                 fflush(m_outputFp);
             else
                 m_fpos += m_membuf.size();
@@ -133,8 +129,7 @@ class FileSink : public ISink
     uint32_t                              m_flushBufSize  = 8 * 1024;
     FILE*                                 m_outputFp      = nullptr;
     bool                                  m_isManageFp    = false;
-    size_t                                m_fpos          = 0;             // file position of membuf, used only when manageFp == true
-    int64_t                               m_flushDelay    = 3000'000'000;  // ns
-    // int64_t                               m_flushDelay    = 30'000'000;  // ns
+    size_t                                m_fpos          = 0;            // file position of membuf, used only when manageFp == true
+    int64_t                               m_flushDelay    = 100'000'000;  // ns
     int64_t                               m_nextFlushTime = (std::numeric_limits<int64_t>::max)();
 };

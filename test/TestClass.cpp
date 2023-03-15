@@ -4,13 +4,14 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:54
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-03-08 09:59:20
+ * LastEditTime : 2023-03-15 19:35:03
  * FilePath     : \\xlog\\test\\TestClass.cpp
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <unistd.h>
 #include "../src/logger.h"
 #include "fmt/core.h"
 // #include "fmt/format.h"
@@ -31,7 +32,12 @@ void runBenchmark()
     t0 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < RECORDS; ++i)
     {
-        logi("Simple log message with one parameters, {}", i);
+        // logi("Simple log message with one parameters, {}", i);
+
+        char        strarr[10] = "111";
+        char*       cstr       = strarr;
+        std::string str        = "aaa";
+        logi("str: {}, pstr: {}, strarr: {}, pstrarr: {}, cstr: {}, pcstr: {}", str, &str, strarr, &strarr, cstr, &cstr);
     }
     t1 = std::chrono::high_resolution_clock::now();
 
@@ -41,6 +47,12 @@ void runBenchmark()
 
 int main(int argc, char* argv[])
 {
+    char        strarr[10] = "111";
+    char*       cstr       = strarr;
+    std::string str        = "aaa";
+    logi("str: {}, pstr: {}, strarr: {}, pstrarr: {}, cstr: {}, pcstr: {}", str, &str, strarr, &strarr, cstr, &cstr);
+
+    return 0;
     // auto func = []()
     // {
     //     std::thread::id tid = std::this_thread::get_id();
@@ -52,7 +64,7 @@ int main(int argc, char* argv[])
     // std::thread t1(func);
     // t1.join();
 
-    fmtlog::setLogFile("/dev/null", false);
+    // fmtlog::setLogFile("/dev/null", false);
 
     std::thread::id                                    tid = std::this_thread::get_id();
 
@@ -132,7 +144,7 @@ int main(int argc, char* argv[])
 
 
     runBenchmark();
-    fmtlog::startPollingThread();
+    // fmtlogWrapper::impl.startPollingThread();
     // fmtlog::poll();
 
     return 0;

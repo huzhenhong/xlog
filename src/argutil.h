@@ -449,23 +449,6 @@ const char* Format(fmt::string_view                                         form
     return pRet;
 }
 
-
-// static void VformatTo(fmt::basic_memory_buffer<char, 10000>& out,
-//                       fmt::string_view                       fmt,
-//                       fmt::format_args                       args)
-// {
-//     fmt::detail::vformat_to(out, fmt, args);
-// }
-
-
-// static void vformat_to(char*            out,
-//                        fmt::string_view fmt,
-//                        fmt::format_args args)
-// {
-//     fmt::vformat_to(out, fmt, args);
-// }
-
-
 static size_t FormattedSize(fmt::string_view fmt, fmt::format_args args)
 {
     auto buf = fmt::detail::counting_buffer<>();

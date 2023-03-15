@@ -4,7 +4,7 @@
  * Author       : huzhenhong
  * Date         : 2022-08-09 13:56:46
  * LastEditors  : huzhenhong
- * LastEditTime : 2023-03-08 09:50:27
+ * LastEditTime : 2023-03-15 16:11:35
  * FilePath     : \\xlog\\src\\logger.h
  * Copyright (C) 2022 huzhenhong. All rights reserved.
  *************************************************************************************/
@@ -21,10 +21,10 @@
 #define FMTLOG(level, format, ...)                                     \
     do                                                                 \
     {                                                                  \
-        static uint32_t logId = 0;                                     \
-                                                                       \
-        if (!fmtlogWrapper::impl.CheckLogLevel(level))                 \
+        if (fmtlogWrapper::impl.IsForbidLevel(level))                  \
             break;                                                     \
+                                                                       \
+        static uint32_t logId = 0;                                     \
                                                                        \
         fmtlogWrapper::impl.Log(logId,                                 \
                                 TimeStampCounterWarpper::impl.Rdtsc(), \
@@ -35,28 +35,41 @@
                                 ##__VA_ARGS__);                        \
     } while (0)
 
+// #define SET_LOG_LEVEL(level) fmtlogWrapper::impl.setLogLevel(level);
+// #define GET_LOG_LEVEL() fmtlogWrapper::impl.getLogLevel();
+
+
 #define FMTLOG_LIMIT(min_interval, level, format, ...)                                        \
     do                                                                                        \
     {                                                                                         \
-        static uint32_t logId   = 0;                                                          \
-        static int64_t  limitNs = 0;                                                          \
-        if (!fmtlogWrapper::impl.CheckLogLevel(level))                                        \
+        if (fmtlogWrapper::impl.IsForbidLevel(level))                                         \
             break;                                                                            \
-        int64_t tsc = TimeStampCounterWarpper::impl.Rdtsc();                                  \
-        int64_t ns  = TimeStampCounterWarpper::impl.Tsc2ns(tsc);                              \
+                                                                                              \
+        static int64_t limitNs = 0;                                                           \
+        int64_t        tsc     = TimeStampCounterWarpper::impl.Rdtsc();                       \
+        int64_t        ns      = TimeStampCounterWarpper::impl.Tsc2ns(tsc);                   \
         if (ns < limitNs)                                                                     \
             break;                                                                            \
-        limitNs = ns + min_interval;                                                          \
+                                                                                              \
+        static uint32_t logId = 0;                                                            \
+        limitNs               = ns + min_interval;                                            \
         fmtlogWrapper::impl.Log(logId, tsc, __FMTLOG_LOCATION, level, format, ##__VA_ARGS__); \
     } while (0)
 
 #define FMTLOG_ONCE(level, format, ...)                                               \
     do                                                                                \
     {                                                                                 \
-        if (!fmtlogWrapper::impl.CheckLogLevel(level))                                \
+        if (fmtlogWrapper::impl.IsForbidLevel(level))                                 \
             break;                                                                    \
+                                                                                      \
         fmtlogWrapper::impl.LogOnce(__FMTLOG_LOCATION, level, format, ##__VA_ARGS__); \
     } while (0)
+
+
+// #define logd(format, ...) FMTLOG(DBG, format, ##__VA_ARGS__)
+// #define logi(format, ...) FMTLOG(INF, format, ##__VA_ARGS__)
+// #define logw(format, ...) FMTLOG(WRN, format, ##__VA_ARGS__)
+// #define loge(format, ...) FMTLOG(ERR, format, ##__VA_ARGS__)
 
 
 #if FMTLOG_ACTIVE_LEVEL <= FMTLOG_LEVEL_DBG
